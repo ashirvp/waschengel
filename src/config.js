@@ -9,6 +9,8 @@
 
 const path = require('path');
 
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
+
 module.exports = {
   // Lexware (formerly lexoffice) API
   lexware: {
@@ -16,9 +18,19 @@ module.exports = {
     apiKey: process.env.LEXWARE_API_KEY,
   },
 
-  // Where we remember the Lexware contactId created for each company, so we
-  // don't create duplicate contacts on every invoice.
-  contactCacheFile: path.join(__dirname, '..', 'data', 'contacts.json'),
+  // Everything the app needs to keep between restarts lives under DATA_DIR.
+  // On a host with an ephemeral filesystem, point DATA_DIR at a mounted volume
+  // or the vehicle registry is lost on every deploy (see the README).
+  dataDir: DATA_DIR,
+
+  // Where we remember the Lexware contactId created for each company. This is
+  // only a cache now: if it's missing, we look the contact up in Lexware by
+  // name instead of blindly creating a second one.
+  contactCacheFile: path.join(DATA_DIR, 'contacts.json'),
+
+  // Plate -> customer/company/history. Lexware has no vehicle entity, so this
+  // is the one piece of data the app owns itself.
+  vehicleFile: path.join(DATA_DIR, 'vehicles.json'),
 
   // --- YOUR THREE CUSTOMER COMPANIES ---------------------------------------
   //
