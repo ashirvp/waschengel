@@ -83,6 +83,21 @@ It prints a report with a PASS/PROBLEM line per check and a summary of what's
 still broken. **It never prints your API key or SMTP password**, so the output
 is safe to paste into a chat or an email when you need help.
 
+### Without a terminal
+
+The checks have to run where the app runs, because that's what has network
+access to Lexware. So the deployed app can show the same report in a browser:
+
+1. Set `ADMIN_TOKEN` in your hosting provider's environment settings to a long
+   random value
+2. Open `https://your-app-url/admin?token=THAT_VALUE` on your phone
+3. Tap **Copy report as text** if you need to send it to someone
+
+The page is **disabled unless `ADMIN_TOKEN` is set**, and a wrong token gets a
+403. Keep the token secret: the report shows your customer names, their email
+addresses and your Lexware account name. It never shows your API key or SMTP
+password.
+
 Two narrower commands do one job each:
 
 ```bash
@@ -350,6 +365,7 @@ relationship is.
 | `src/contacts.js` | resolves each company to its real Lexware customer |
 | `scripts/list-articles.js` | `npm run articles` — check your product titles match |
 | `scripts/list-contacts.js` | `npm run contacts` — check your customers resolve |
+| `src/checks.js` | the setup checks, shared by `npm run doctor` and `/admin` |
 | `scripts/doctor.js` | `npm run doctor` — check everything at once |
 | `src/plates.js` | plate normalization; the basis of duplicate detection |
 | `src/store.js` | the vehicle registry (plate → customer, company, history) |
@@ -370,6 +386,8 @@ relationship is.
   <https://app.lexware.de/addons/public-api> and issue a new one. A Lexware key
   can read and write your invoices and customer data.
 - **The app has no login** — see the note above.
+- **`/admin` is off by default.** It only works when `ADMIN_TOKEN` is set, and
+  it exposes customer names and emails, so treat the token like a password.
 
 ## Troubleshooting
 
