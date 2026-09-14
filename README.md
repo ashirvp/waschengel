@@ -70,7 +70,27 @@ to red.
 put the real values in your hosting provider's environment-variable settings
 instead.
 
-## 3. Run it locally to test
+## 3. Check the setup
+
+One command checks everything — the API key, the three customers, the products,
+the email login, and whether the vehicle registry can actually persist:
+
+```bash
+npm run doctor
+```
+
+It prints a report with a PASS/PROBLEM line per check and a summary of what's
+still broken. **It never prints your API key or SMTP password**, so the output
+is safe to paste into a chat or an email when you need help.
+
+Two narrower commands do one job each:
+
+```bash
+npm run contacts   # which Lexware customer each brand bills, and its email
+npm run articles   # your products, and which ones staff will be offered
+```
+
+## 4. Run it locally to test
 
 ```bash
 npm install
@@ -80,7 +100,7 @@ npm start
 Open <http://localhost:3000> and create a test invoice. Check that it shows up
 in your Lexware voucher list and that the email arrives.
 
-## 4. What Lexware/lexoffice can and can't do here
+## 5. What Lexware/lexoffice can and can't do here
 
 This is the part worth understanding before you change anything, because it
 drives the whole design.
@@ -181,7 +201,7 @@ default because the exact payload can't be verified without sending a real
 invoice from your account. Turn it on, send **one test invoice**, check it looks
 right in Lexware, and keep it on only if it does.
 
-## 5. Duplicate prevention
+## 6. Duplicate prevention
 
 Two different duplicates can happen, and they're prevented in two different
 places.
@@ -221,17 +241,31 @@ leave you billing the old customer.
 (`LEXWARE_CREATE_CONTACTS=true` restores the old create-if-missing behaviour.
 Leave it off unless you're setting up a throwaway test account.)
 
-## 6. Deploy it cheaply
+## 7. Deploy it cheaply
 
-This is a small Node server, so it needs somewhere that can run Node and hold
-your secrets — it can't go on a purely static host like GitHub Pages, because
-the Lexware API key must never reach the browser.
+This is a small Node server that **needs a real disk**, so it needs somewhere
+that can run Node, hold your secrets, and keep a file between restarts.
+
+> **Vercel, Netlify and AWS Lambda will not work as-is.** They are serverless:
+> the filesystem is read-only apart from `/tmp`, and `/tmp` is wiped between
+> requests. The app would still create invoices, but the vehicle registry could
+> never persist, so **every car would be forgotten immediately** and the plate
+> lookup — the whole point of the redesign — would never find anything.
+> `npm run doctor` detects this and says so.
+>
+> To use Vercel anyway, the registry has to move out of the filesystem and into
+> a hosted database (Vercel KV, Upstash and Neon all have free tiers). That's a
+> change to `src/store.js`; ask if you want it.
+
+It also can't go on a purely static host like GitHub Pages, because the Lexware
+API key must never reach the browser.
 
 Traffic here is tiny (a handful of invoices a day), so the cheapest tiers are
 plenty. In rough order of cost:
 
 | Option | Cost | Trade-off |
 | --- | --- | --- |
+| **Fly.io**, one machine + small volume | Often free at this size | Real disk, auto-stops when idle |
 | **Render**, free web service | Free | Sleeps after ~15 min idle; first request after a nap takes ~30–60s |
 | **Fly.io**, one small machine | A few € / month | Can auto-stop when idle, so you pay close to nothing |
 | **Railway** | A few € / month | Simplest setup, always awake |
@@ -316,12 +350,26 @@ relationship is.
 | `src/contacts.js` | resolves each company to its real Lexware customer |
 | `scripts/list-articles.js` | `npm run articles` — check your product titles match |
 | `scripts/list-contacts.js` | `npm run contacts` — check your customers resolve |
+| `scripts/doctor.js` | `npm run doctor` — check everything at once |
 | `src/plates.js` | plate normalization; the basis of duplicate detection |
 | `src/store.js` | the vehicle registry (plate → customer, company, history) |
 | `src/lexware.js` | Lexware API calls, contact dedupe, rate limiting |
 | `src/mailer.js` | sending the invoice PDF over SMTP |
 | `server.js` | HTTP endpoints and the invoice flow |
 | `public/index.html` | the whole mobile UI, no build step |
+
+## Security
+
+- **Never commit `.env`.** It is in `.gitignore`; keep it there. Put the real
+  values in your hosting provider's environment settings.
+- **This repository is public.** Anything committed here is world-readable and
+  stays in the git history even after you delete it. Automated scanners find
+  committed API keys within minutes, so a key that lands in a commit must be
+  treated as compromised and rotated, not just removed.
+- **If a key is ever exposed**, revoke it at
+  <https://app.lexware.de/addons/public-api> and issue a new one. A Lexware key
+  can read and write your invoices and customer data.
+- **The app has no login** — see the note above.
 
 ## Troubleshooting
 
@@ -353,5 +401,7 @@ relationship is.
   the unused one in Lexware and the app will settle on the survivor.
 - **"This plate is already on file"** — working as intended: the car is known
   under a different name or company. Pick whichever is correct.
+- **Anything at all** — run `npm run doctor` first; it checks every one of the
+  causes below in one go.
 - **Lookup says "Lookup failed"** — the app is unreachable or the registry is
   unreadable; the worker can still type everything by hand and invoice.

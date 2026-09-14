@@ -105,6 +105,20 @@ async function createContact({ name, email, countryCode = 'DE' }) {
   return res.json();
 }
 
+// The account behind the API key. Used by `npm run doctor` to prove the key
+// works and to show WHICH Lexware account it belongs to.
+async function getProfile() {
+  const res = await lexFetch('/profile', { method: 'GET', headers: headers() });
+  return res.json();
+}
+
+// One contact in full, for checking a customer record is complete enough to
+// invoice (address, VAT id, email).
+async function getContact(contactId) {
+  const res = await lexFetch(`/contacts/${contactId}`, { method: 'GET', headers: headers() });
+  return res.json();
+}
+
 // Lists the products/services ("Artikel") from Lexware. These are the service
 // packages staff pick from, so prices live in Lexware and not in this repo.
 async function listArticles({ maxPages = 10, size = 100 } = {}) {
@@ -187,6 +201,8 @@ async function downloadInvoiceFile(invoiceId) {
 }
 
 module.exports = {
+  getProfile,
+  getContact,
   listArticles,
   searchContacts,
   createContact,
