@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Garage Invoice</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #121316;
+    --card: #1b1d22;
+    --card-2: #202329;
+    --line: #2c2f36;
+    --text: #eef0f3;
+    --muted: #9198a3;
+    --muted-2: #6b7180;
+    --ok: #35c46a;
+    --err: #ef4b52;
+
+    /* Brand identity — the company you pick recolors the whole console.
+       This isn't decoration: a wrong brand color on screen is a visible
+       flag that you're about to invoice the wrong company.
+       To add a company, add a [data-brand="yourkey"] block below using the
+       same key you used in src/config.js. Unlisted keys fall back to this. */
+    --accent: #d2001c;
+    --accent-contrast: #ffffff;
+  }
+
+  [data-brand="lambo_mclaren"] {
+    --accent: #e8d200;
+    --accent-contrast: #14151a;
+  }
+
+  [data-brand="ferrari"] {
+    --accent: #d2001c;
+    --accent-contrast: #ffffff;
+  }
+
+  [data-brand="bentley"] {
+    --accent: #1f7a4d;
+    --accent-contrast: #ffffff;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background-image:
+      radial-gradient(1200px 600px at 50% -10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 60%);
+    transition: background-image 0.4s ease;
+  }
+
+  .console {
+    width: 100%;
+    max-width: 440px;
+  }
+
+  .eyebrow {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-size: 12px;
+    color: var(--muted-2);
+    text-align: center;
+    margin: 0 0 10px;
+  }
+
+  /* Auto-fits however many companies are in config.js — 2, 3, or more. */
+  .brand-tabs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+
+  .brand-tab {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-size: 17px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 16px 8px;
+    border-radius: 12px;
+    border: 1.5px solid var(--line);
+    background: var(--card);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .brand-tab[aria-pressed="true"] {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 16%, var(--card));
+    color: var(--text);
+    box-shadow: 0 0 0 1px var(--accent) inset;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 24px;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+
+  .card-header .brand-name {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: 0.02em;
+  }
+
+  .card-header .stripe {
+    width: 36px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--accent);
+  }
+
+  label {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 16px 0 6px;
+  }
+
+  label:first-of-type { margin-top: 0; }
+
+  input[type="text"],
+  input[type="email"],
+  select {
+    width: 100%;
+    background: var(--card-2);
+    border: 1.5px solid var(--line);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    padding: 14px 14px;
+    border-radius: 12px;
+    outline: none;
+    transition: border-color 0.15s ease;
+    appearance: none;
+  }
+
+  input::placeholder { color: var(--muted-2); }
+
+  input:focus,
+  select:focus {
+    border-color: var(--accent);
+  }
+
+  select {
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+                       linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 20px) center, calc(100% - 15px) center;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+  }
+
+  .package-price {
+    font-size: 12.5px;
+    color: var(--muted-2);
+    margin-top: 6px;
+  }
+
+  button.submit {
+    width: 100%;
+    margin-top: 22px;
+    padding: 17px;
+    border-radius: 12px;
+    border: none;
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--accent-contrast);
+    background: var(--accent);
+    cursor: pointer;
+    transition: filter 0.15s ease, transform 0.05s ease;
+  }
+
+  button.submit:hover { filter: brightness(1.08); }
+  button.submit:active { transform: scale(0.99); }
+  button.submit:disabled { opacity: 0.55; cursor: default; }
+
+  .status {
+    margin-top: 16px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.5;
+    display: none;
+  }
+
+  .status.show { display: block; }
+  .status.ok { background: color-mix(in srgb, var(--ok) 14%, var(--card)); border: 1px solid color-mix(in srgb, var(--ok) 40%, var(--line)); color: #d5f5e0; }
+  .status.err { background: color-mix(in srgb, var(--err) 14%, var(--card)); border: 1px solid color-mix(in srgb, var(--err) 40%, var(--line)); color: #ffd9da; }
+  .status.warn { background: color-mix(in srgb, #e8b400 14%, var(--card)); border: 1px solid color-mix(in srgb, #e8b400 40%, var(--line)); color: #ffe9b0; }
+
+  .status strong { display: block; margin-bottom: 2px; font-weight: 700; }
+
+  .footnote {
+    text-align: center;
+    color: var(--muted-2);
+    font-size: 12px;
+    margin-top: 16px;
+  }
+</style>
+</head>
+<body data-brand="ferrari">
+  <div class="console">
+    <p class="eyebrow">Garage Invoice</p>
+    <div class="brand-tabs" id="brandTabs" role="tablist" aria-label="Choose company"></div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="brand-name" id="brandName">Ferrari</span>
+        <span class="stripe"></span>
+      </div>
+
+      <form id="invoiceForm">
+        <label for="customerName">Customer name</label>
+        <input type="text" id="customerName" placeholder="e.g. John Smith" autocomplete="off" required />
+
+        <label for="licensePlate">License plate</label>
+        <input type="text" id="licensePlate" placeholder="e.g. N-AB 1234" autocomplete="off" required />
+
+        <label for="packageKey">Service package</label>
+        <select id="packageKey" required></select>
+        <div class="package-price" id="packagePrice"></div>
+
+        <label for="email">Email (optional — leave blank to use the company's billing email)</label>
+        <input type="email" id="email" placeholder="billing@company.com" autocomplete="off" />
+
+        <button type="submit" class="submit" id="submitBtn">Create Invoice</button>
+      </form>
+
+      <div class="status" id="status"></div>
+    </div>
+
+    <p class="footnote">No login needed — this link creates invoices directly in Lexware.</p>
+  </div>
+
+<script>
+  const body = document.body;
+  const brandName = document.getElementById('brandName');
+  const tabsContainer = document.getElementById('brandTabs');
+  let tabs = [];
+  const packageSelect = document.getElementById('packageKey');
+  const packagePrice = document.getElementById('packagePrice');
+  const form = document.getElementById('invoiceForm');
+  const submitBtn = document.getElementById('submitBtn');
+  const statusBox = document.getElementById('status');
+
+  let currentCompany = null;
+  let appConfig = null;
+
+  async function loadConfig() {
+    const res = await fetch('/api/config');
+    appConfig = await res.json();
+
+    const keys = Object.keys(appConfig.companies);
+    currentCompany = keys[0];
+
+    // One button per company in src/config.js — add or remove there, not here.
+    tabsContainer.innerHTML = keys
+      .map(key => `<button type="button" class="brand-tab" data-company="${key}" aria-pressed="false">${appConfig.companies[key].label}</button>`)
+      .join('');
+
+    tabs = [...tabsContainer.querySelectorAll('.brand-tab')];
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => selectCompany(tab.dataset.company));
+    });
+
+    selectCompany(currentCompany);
+  }
+
+  function selectCompany(key) {
+    currentCompany = key;
+    tabs.forEach(t => t.setAttribute('aria-pressed', String(t.dataset.company === key)));
+    body.dataset.brand = key;
+    brandName.textContent = appConfig?.companies[key]?.label || key;
+    renderPackagesForCurrentCompany();
+    hideStatus();
+  }
+
+  // Each company has its own package list/prices — rebuild the dropdown
+  // whenever the selected brand changes.
+  function renderPackagesForCurrentCompany() {
+    const packages = appConfig?.companies[currentCompany]?.packages || [];
+    packageSelect.innerHTML = packages
+      .map(p => `<option value="${p.key}" data-price="${p.netPrice}">${p.label}</option>`)
+      .join('');
+    updatePackagePrice();
+  }
+
+  function updatePackagePrice() {
+    const opt = packageSelect.selectedOptions[0];
+    if (!opt) return;
+    packagePrice.textContent = `Net €${Number(opt.dataset.price).toFixed(2)} (+ 19% VAT)`;
+  }
+
+  packageSelect.addEventListener('change', updatePackagePrice);
+
+  function showStatus(kind, title, message) {
+    statusBox.className = `status show ${kind}`;
+    statusBox.innerHTML = `<strong>${title}</strong>${message}`;
+  }
+
+  function hideStatus() {
+    statusBox.className = 'status';
+    statusBox.innerHTML = '';
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideStatus();
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating…';
+
+    const payload = {
+      company: currentCompany,
+      customerName: document.getElementById('customerName').value,
+      licensePlate: document.getElementById('licensePlate').value,
+      packageKey: packageSelect.value,
+      email: document.getElementById('email').value,
+    };
+
+    try {
+      const res = await fetch('/api/invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showStatus('err', 'Could not create invoice', data.error || 'Unknown error. Please try again.');
+      } else if (data.emailed) {
+        showStatus('ok', `Invoice ${data.voucherNumber} created`, `Emailed to ${data.sentTo}.`);
+        form.reset();
+        updatePackagePrice();
+      } else {
+        showStatus('warn', `Invoice ${data.voucherNumber} created`, `Saved in Lexware, but the email could not be sent (${data.emailError || 'unknown error'}). Ask the office to send it manually.`);
+        form.reset();
+        updatePackagePrice();
+      }
+    } catch (err) {
+      showStatus('err', 'Network error', 'Could not reach the server. Check your connection and try again.');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Create Invoice';
+    }
+  });
+
+  loadConfig();
+</script>
+</body>
+</html>
