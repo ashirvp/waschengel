@@ -54,6 +54,33 @@ function scheduleRequest(run) {
   return result;
 }
 
+// Lexware reports validation failures as a JSON body, not a sentence. Pull the
+// useful parts out of it, or the app shows "[object Object]" and nobody can
+// tell which field it objected to.
+function describeLexwareError(detail) {
+  if (!detail) return null;
+  if (typeof detail === 'string') return detail.slice(0, 500);
+
+  const parts = [];
+  if (detail.message) parts.push(String(detail.message));
+  else if (detail.error) parts.push(String(detail.error));
+
+  // 406 validation failures arrive as a list of field-level issues.
+  const issues = detail.IssueList || detail.issueList || detail.issues;
+  if (Array.isArray(issues)) {
+    issues.forEach((i) => {
+      const where = i.source || i.field || i.path;
+      const what = i.type || i.i18nKey || i.code || i.message;
+      if (where || what) parts.push([where, what].filter(Boolean).join(' → '));
+    });
+  }
+
+  if (!parts.length) {
+    try { parts.push(JSON.stringify(detail).slice(0, 500)); } catch { /* ignore */ }
+  }
+  return parts.join(' | ') || null;
+}
+
 async function lexFetch(pathname, options = {}, attempt = 0) {
   const res = await scheduleRequest(() =>
     fetch(`${config.lexware.baseUrl}${pathname}`, options)
@@ -73,9 +100,17 @@ async function lexFetch(pathname, options = {}, attempt = 0) {
     } catch {
       detail = await res.text();
     }
-    const err = new Error(`Lexware API ${res.status} ${res.statusText} on ${pathname}`);
+    const described = describeLexwareError(detail);
+    const err = new Error(
+      `Lexware API ${res.status} ${res.statusText} on ${pathname}` +
+        (described ? ` — ${described}` : '')
+    );
     err.status = res.status;
     err.detail = detail;
+    // Always a string, so it can go straight onto a screen.
+    err.describe = described || `${res.status} ${res.statusText}`;
+    // The whole body in the server log, for anything the summary misses.
+    console.error(`Lexware ${res.status} on ${pathname}:`, JSON.stringify(detail));
     throw err;
   }
   return res;
@@ -182,12 +217,23 @@ async function createInvoice({ contactId, introduction, lineItem }) {
     line.type = lineItem.articleType === 'PRODUCT' ? 'material' : 'service';
   }
 
+  const now = new Date().toISOString();
+
   const body = {
-    voucherDate: new Date().toISOString(),
+    voucherDate: now,
     address: { contactId },
     lineItems: [line],
     totalPrice: { currency: 'EUR' },
     taxConditions: { taxType: 'net' },
+    // Required by Lexware, and it is also the Leistungsdatum on the printed
+    // invoice: the day the wash was actually done, which is today.
+    // If your account rejects "service", set LEXWARE_SHIPPING_TYPE (other
+    // values Lexware documents are: delivery, serviceperiod, deliveryperiod,
+    // none) rather than editing this file.
+    shippingConditions: {
+      shippingDate: now,
+      shippingType: config.shippingType,
+    },
     introduction,
   };
 
@@ -220,6 +266,7 @@ async function downloadInvoiceFile(invoiceId) {
 }
 
 module.exports = {
+  describeLexwareError,
   isAuthConfigured,
   describeAuth,
   getProfile,

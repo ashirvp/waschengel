@@ -382,6 +382,14 @@
 
   // ---- Result -----------------------------------------------------------
 
+  // An error detail can arrive as an object; concatenating one gives the
+  // useless "[object Object]" instead of the reason.
+  function asText(v) {
+    if (v == null) return '';
+    if (typeof v === 'string') return v;
+    try { return JSON.stringify(v); } catch (e) { return String(v); }
+  }
+
   function showResult(body, errorMessage, detail) {
     var ok = !!body;
     $('resultIcon').className = 'icon' + (ok ? '' : ' warn');
@@ -394,7 +402,7 @@
     $('resultDetail').textContent = ok
       ? 'Saved in Lexware for ' + (body.recipientName || 'the customer') +
         '. The office sends it from Lexware.'
-      : errorMessage + (detail ? ' (' + detail + ')' : '');
+      : errorMessage + (detail ? ' — ' + asText(detail) : '');
     $('resultNext').textContent = ok ? 'Next car' : 'Back';
     $('resultOverlay').setAttribute('data-open', 'true');
   }

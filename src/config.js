@@ -98,6 +98,10 @@ module.exports = {
   // contact with no address on a real invoice.
   allowContactCreation: process.env.LEXWARE_CREATE_CONTACTS === 'true',
 
+  // How the service date is expressed on the invoice. Lexware requires
+  // shippingConditions; "service" means the work was done on that date.
+  shippingType: process.env.LEXWARE_SHIPPING_TYPE || 'service',
+
   // Only used if an article somehow has no tax rate of its own.
   taxRatePercentage: 19,
 

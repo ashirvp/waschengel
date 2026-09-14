@@ -242,7 +242,7 @@ app.post('/api/invoice', async (req, res) => {
     console.error('Contact resolution failed:', err.message);
     return res.status(502).json({
       error: `Could not find the Lexware customer for ${companyConfig.label}.`,
-      detail: err.message,
+      detail: String(err.message),
     });
   }
 
@@ -281,8 +281,8 @@ app.post('/api/invoice', async (req, res) => {
   } catch (err) {
     console.error('Invoice creation failed:', err.detail || err.message);
     res.status(502).json({
-      error: 'Could not create the invoice in Lexware. Please try again or check with the office.',
-      detail: err.detail || err.message,
+      error: 'Could not create the invoice in Lexware.',
+      detail: err.describe || err.message,
     });
   }
 });

@@ -359,5 +359,10 @@ already has it.
 - **Amber "prices could not be loaded from Lexware"** — the app is showing its
   built-in fallback prices. Check `LEXWARE_API_KEY` and that the account's plan
   includes API access.
+- **"Could not create the invoice in Lexware"** — the message after the dash is
+  Lexware's own, naming the field it rejected (e.g.
+  `shippingConditions → not_empty`). The full response body is in the server
+  log. If it names `shippingConditions`, try setting `LEXWARE_SHIPPING_TYPE` to
+  `delivery` or `none`.
 - **Anything at all** — run `npm run doctor` first; it checks every one of the
   causes below in one go.
