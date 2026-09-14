@@ -65,8 +65,8 @@ module.exports = {
       billingEmailOverride: process.env.LAMBO_MCLAREN_BILLING_EMAIL || null,
       address: { countryCode: 'DE' },
       packages: [
-        'Complete GW',
-        'Complete NW',
+        'Komplett GW',
+        'Komplett NW',
         'Servicewäsche Basic',
         'Servicewäsche Plus',
       ],
@@ -74,13 +74,13 @@ module.exports = {
 
     ferrari: {
       label: 'Ferrari',
-      contactName: 'Scuderia Feser Graf GmbH',
+      contactName: 'Scuderia Feser-Graf GmbH',
       billingEmailOverride: process.env.FERRARI_BILLING_EMAIL || null,
       address: { countryCode: 'DE' },
       packages: [
-        'Complete Ferrari NW',
-        'Complete GW',
-        'Complete NW',
+        'Komplett Ferrari NW',
+        'Komplett GW',
+        'Komplett NW',
         'Servicewäsche Basic',
         'Servicewäsche Plus',
       ],
@@ -88,12 +88,12 @@ module.exports = {
 
     bentley: {
       label: 'Bentley',
-      contactName: 'Feser Graf Exclusive Cars GmbH',
+      contactName: 'Feser- Graf Exclusive Cars GmbH',
       billingEmailOverride: process.env.BENTLEY_BILLING_EMAIL || null,
       address: { countryCode: 'DE' },
       packages: [
-        'Complete GW',
-        'Complete NW',
+        'Komplett GW',
+        'Komplett NW',
         'Servicewäsche Basic',
         'Servicewäsche Plus',
       ],
