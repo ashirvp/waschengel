@@ -1,12 +1,17 @@
 # Garage Invoice App
 
 One screen, three taps. A worker types the vehicle number, taps the company,
-taps the service package — the app creates the invoice in Lexware (formerly
-lexoffice) and emails it automatically. No Lexware login for staff, ever.
+taps the service package — the app creates the finalised invoice in Lexware
+(formerly lexoffice). No Lexware login for staff, ever.
 
 ```
-Vehicle number  ->  Company  ->  Package  ->  invoice created + emailed
+Vehicle number  ->  Company  ->  Package  ->  invoice created in Lexware
 ```
+
+**The app does not send email.** The invoice is finalised in Lexware and the
+office sends it from there, so Lexware keeps its own sent-status, send history
+and dunning. That also means there is no SMTP to configure and no mail server
+to go wrong.
 
 **The app stores nothing.** There is no database, no customer records, no
 vehicle history, no files on disk. The vehicle number is written onto the
@@ -42,17 +47,9 @@ cp .env.example .env
 Open `.env` and fill in:
 
 - `LEXWARE_API_KEY` — the key from step 1
-- `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` — the mailbox the invoice email is
-  sent from. Use the address on your letterhead (`info@waschengel.info`) so the
-  email and the invoice match. `SMTP_PORT` (587), `SMTP_SECURE` (false) and
-  `SMTP_FROM` (same as `SMTP_USER`) have defaults and can be left out (a normal Gmail/Outlook/company
-  mailbox works; for Gmail use an
-  [app password](https://support.google.com/accounts/answer/185833), not your
-  normal password)
-- `LAMBO_MCLAREN_BILLING_EMAIL`, `FERRARI_BILLING_EMAIL`,
-  `BENTLEY_BILLING_EMAIL` — **optional.** Leave empty and each invoice goes to
-  the email on that customer's record in Lexware, which is what you normally
-  want. Set one only to redirect a company's invoices elsewhere.
+
+That's the only required setting. `ADMIN_TOKEN` is optional and enables the
+setup report at `/admin` (see below).
 
 **To change a price**, change it in Lexware. Nothing here needs touching.
 
@@ -90,7 +87,7 @@ npm run doctor
 ```
 
 It prints a report with a PASS/PROBLEM line per check and a summary of what's
-still broken. **It never prints your API key or SMTP password**, so the output
+still broken. **It never prints your API key**, so the output
 is safe to paste into a chat or an email when you need help.
 
 ### Without a terminal
@@ -105,8 +102,7 @@ access to Lexware. So the deployed app can show the same report in a browser:
 
 The page is **disabled unless `ADMIN_TOKEN` is set**, and a wrong token gets a
 403. Keep the token secret: the report shows your customer names, their email
-addresses and your Lexware account name. It never shows your API key or SMTP
-password.
+addresses and your Lexware account name. It never shows your API key.
 
 Two narrower commands do one job each:
 
@@ -235,14 +231,12 @@ The app refuses rather than guessing, and says why on screen:
   before anyone taps anything. `contactName` in `src/config.js` must match the
   customer in Lexware exactly, punctuation included. The app never creates a customer: a bare
   stand-in with no address on a real invoice is worse than an error.
-- **A customer has no email on file** — blocked with that specific reason,
-  rather than creating an invoice nobody receives.
 - **A package isn't on that company's list** — rejected, so Bentley can't be
   billed for a Ferrari-only product.
 - **Prices can't be loaded from Lexware** — staff see a built-in fallback list
   with an amber warning that the prices aren't live.
-- **The invoice is created but the email fails** — the screen says exactly
-  that. The invoice is safe in Lexware; only the email needs redoing.
+- **A customer has no email in Lexware** — the invoice is still created; the
+  office just can't send it in one click until an address is added.
 
 ## 7. Deploy it cheaply
 
@@ -254,7 +248,7 @@ serve `public/index.html` as a static page and 404 every `/api/` call — the
 screen would appear and nothing on it would work.
 
 Beyond that, just set the environment variables (`LEXWARE_API_KEY`, the
-`SMTP_*` values, `ADMIN_TOKEN`) in the Vercel project settings and deploy.
+`ADMIN_TOKEN`) in the Vercel project settings and deploy.
 Because the app stores nothing, there is no database or volume to add.
 
 ### Other hosts
@@ -279,15 +273,15 @@ Worker (phone/tablet)
    │  types the vehicle number
    │  taps the company
    │  taps a package   (only that company's packages and prices)
-   │  taps Create & Send
+   │  taps Create Invoice
    ▼
 This web app (Node/Express, stateless)
    │
    ├─► Lexware API: find the company's customer record (never creates one)
-   ├─► Lexware API: create + finalize the invoice, vehicle number on the line
-   ├─► Lexware API: download the invoice PDF
-   └─► SMTP: email the PDF to that customer's address from Lexware
+   └─► Lexware API: create + finalize the invoice, vehicle number on the line
 ```
+
+The office then sends it from Lexware.
 
 The vehicle number is written onto the invoice as text and kept nowhere else,
 so no customer or vehicle database is needed. Only the three dealer companies
@@ -305,41 +299,28 @@ is.
 | `src/articles.js` | fetches packages/prices from Lexware, caches, falls back |
 | `src/contacts.js` | resolves each company to its real Lexware customer |
 | `src/lexware.js` | Lexware API calls and rate limiting |
-| `src/mailer.js` | the German invoice email and your letterhead signature |
 | `src/plates.js` | tidying the vehicle number for the invoice |
 | `src/checks.js` | the setup checks, shared by `npm run doctor` and `/admin` |
 | `public/index.html` | the whole mobile UI, no build step |
 
-## The invoice email
+## Sending the invoice
 
-The email is German, since the recipients are German dealerships and the
-attached invoice is a German document:
+The app finalises the invoice in Lexware and stops there. Someone in the office
+opens Lexware and sends it to the dealer with the normal Send button.
 
-```
-From:    Waschengel GmbH <info@waschengel.info>
-Subject: Rechnung RE-2026-0001 – Fahrzeug M-AB 1234
+This is deliberate. Lexware's public API can create a document and hand you the
+PDF, but it has no endpoint for emailing one — so any automatic sending would
+have to go out through a separate mailbox, and Lexware would never know it
+happened. The invoice would not be marked as sent, there would be no send
+history, and dunning would not see it.
 
-Guten Tag,
+Each company's customer record in Lexware should therefore have an **email
+address on file**, so the office can send in one click. `npm run doctor` and
+`/admin` both flag a customer that is missing one.
 
-anbei erhalten Sie unsere Rechnung RE-2026-0001 für das Fahrzeug M-AB 1234.
-
-Mit freundlichen Grüßen
-Waschengel GmbH
---
-Waschengel GmbH
-Äußere Sulzbacher Straße 23
-90491 Nürnberg
-...
-```
-
-The signature comes from the `business` block in `src/config.js`, which should
-match your Lexware letterhead. Every field can be overridden with a
-`BUSINESS_*` environment variable.
-
-**Lexware itself does not send the email.** Its public API creates the invoice
-and gives you the PDF, but has no endpoint to mail a document, so this app does
-the sending. That means `SMTP_FROM` decides what the dealer sees as the sender
-— set it to the address on your letterhead.
+The confirmation screen tells the worker exactly this — "Saved in Lexware for
+<customer>. The office sends it from Lexware." — so nobody assumes the dealer
+already has it.
 
 ## Security
 
@@ -360,9 +341,6 @@ the sending. That means `SMTP_FROM` decides what the dealer sees as the sender
 
 - **"LEXWARE_API_KEY is not set"** — check `.env` (locally) or your hosting
   provider's environment variables (in production).
-- **Invoice created but no email** — check the SMTP credentials; the invoice is
-  still safely saved in Lexware either way (the app says so in an amber
-  "Invoice created" message).
 - **Wrong price for a package** — change it in Lexware; the app picks it up
   within ten minutes (restart to apply immediately).
 - **A package is missing from the app** — its title in that company's

@@ -50,10 +50,6 @@ module.exports = {
   //                its address, payment terms and email from Lexware. If it
   //                doesn't match a customer, the app says so instead of
   //                inventing one — run `npm run contacts` to check.
-  // billingEmailOverride
-  //              : OPTIONAL. By default the invoice goes to the email on the
-  //                Lexware customer record. Set this only to send somewhere
-  //                else, e.g. a shared accounts-payable inbox.
   // packages     : OPTIONAL. Omit it and the company offers packageAllowlist
   //                above (the same list for every car). Set it to a list of
   //                titles to give one company a different menu.
@@ -62,7 +58,6 @@ module.exports = {
     lambo_mclaren: {
       label: 'Lamborghini / McLaren',
       contactName: 'Feser Sportwagen GmbH',
-      billingEmailOverride: process.env.LAMBO_MCLAREN_BILLING_EMAIL || null,
       address: { countryCode: 'DE' },
       packages: [
         'Komplett GW',
@@ -75,7 +70,6 @@ module.exports = {
     ferrari: {
       label: 'Ferrari',
       contactName: 'Scuderia Feser-Graf GmbH',
-      billingEmailOverride: process.env.FERRARI_BILLING_EMAIL || null,
       address: { countryCode: 'DE' },
       packages: [
         'Komplett Ferrari NW',
@@ -89,7 +83,6 @@ module.exports = {
     bentley: {
       label: 'Bentley',
       contactName: 'Feser- Graf Exclusive Cars GmbH',
-      billingEmailOverride: process.env.BENTLEY_BILLING_EMAIL || null,
       address: { countryCode: 'DE' },
       packages: [
         'Komplett GW',
@@ -108,29 +101,6 @@ module.exports = {
   // Only used if an article somehow has no tax rate of its own.
   taxRatePercentage: 19,
 
-  // --- YOUR BUSINESS -------------------------------------------------------
-  // Used as the sender name and the signature under the invoice email, so it
-  // matches your Lexware letterhead. Public business details (the same ones on
-  // your Impressum), not secrets.
-  business: {
-    name: process.env.BUSINESS_NAME || 'Waschengel GmbH',
-    street: process.env.BUSINESS_STREET || 'Äußere Sulzbacher Straße 23',
-    zip: process.env.BUSINESS_ZIP || '90491',
-    city: process.env.BUSINESS_CITY || 'Nürnberg',
-    phone: process.env.BUSINESS_PHONE || '09131/1239258',
-    email: process.env.BUSINESS_EMAIL || 'info@waschengel.info',
-    web: process.env.BUSINESS_WEB || 'www.waschengel.de',
-  },
-
-  // Outgoing email (SMTP) used to send the finished invoice PDF.
-  smtp: {
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === 'true',
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
-  },
 };
 
 // The set of Lexware products the app cares about: every title mentioned by any

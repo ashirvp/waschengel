@@ -1,7 +1,7 @@
 {
   "name": "garage-invoice-app",
   "version": "1.0.0",
-  "description": "Mobile-first web app for creating and emailing Lexware/lexoffice invoices for garage jobs, with license-plate customer lookup.",
+  "description": "Mobile-first web app for creating Lexware/lexoffice invoices for garage jobs in three taps.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -14,8 +14,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "express": "^4.19.2",
     "dotenv": "^16.4.5",
-    "nodemailer": "^6.9.14"
+    "express": "^4.19.2"
   }
 }

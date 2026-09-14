@@ -158,14 +158,14 @@
       <div class="lbl">Total</div>
       <div class="val" id="totalVal">—</div>
     </div>
-    <button class="btn-primary" id="submitBtn" disabled>Create &amp; Send</button>
+    <button class="btn-primary" id="submitBtn" disabled>Create Invoice</button>
   </div>
 </div>
 
 <div class="overlay" id="resultOverlay">
   <div class="sheet">
     <div class="icon" id="resultIcon">✓</div>
-    <h2 id="resultTitle">Invoice sent</h2>
+    <h2 id="resultTitle">Invoice created</h2>
     <div class="voucher" id="resultVoucher"></div>
     <div class="plate-out" id="resultPlate"></div>
     <p id="resultDetail"></p>
@@ -255,10 +255,12 @@
       box.className = 'recipient';
       who.textContent = company.recipient.name;
       box.appendChild(who);
-      var mail = document.createElement('div');
-      mail.className = 'mail';
-      mail.textContent = company.recipient.email || 'no email on file — invoice cannot be sent';
-      box.appendChild(mail);
+      if (company.recipient.email) {
+        var mail = document.createElement('div');
+        mail.className = 'mail';
+        mail.textContent = company.recipient.email;
+        box.appendChild(mail);
+      }
     } else {
       box.className = 'recipient bad';
       who.textContent = 'Customer not found in Lexware';
@@ -335,7 +337,7 @@
 
     var ready = !!(state.company && state.packageKey && plateOk());
     $('submitBtn').disabled = !ready || state.busy;
-    $('submitBtn').textContent = state.busy ? 'Sending…' : 'Create & Send';
+    $('submitBtn').textContent = state.busy ? 'Working…' : 'Create Invoice';
   }
 
   plateEl.addEventListener('input', function () {
@@ -382,16 +384,17 @@
 
   function showResult(body, errorMessage, detail) {
     var ok = !!body;
-    $('resultIcon').className = 'icon' + (ok && body.emailed ? '' : ' warn');
-    $('resultIcon').textContent = ok && body.emailed ? '✓' : '!';
-    $('resultTitle').textContent = !ok ? 'Not created' : body.emailed ? 'Invoice sent' : 'Invoice created';
+    $('resultIcon').className = 'icon' + (ok ? '' : ' warn');
+    $('resultIcon').textContent = ok ? '✓' : '!';
+    $('resultTitle').textContent = ok ? 'Invoice created' : 'Not created';
     $('resultVoucher').textContent = ok ? (body.voucherNumber || '') : '';
     $('resultPlate').textContent = ok ? (body.plate || '') : '';
-    $('resultDetail').textContent = !ok
-      ? errorMessage + (detail ? ' (' + detail + ')' : '')
-      : body.emailed
-        ? 'Emailed to ' + (body.recipientName ? body.recipientName + ' (' + body.sentTo + ')' : body.sentTo)
-        : 'Saved in Lexware, but the email did not go out. Tell the office.';
+    // The app does not send anything, so say plainly that the invoice is
+    // waiting in Lexware — otherwise a worker assumes the customer has it.
+    $('resultDetail').textContent = ok
+      ? 'Saved in Lexware for ' + (body.recipientName || 'the customer') +
+        '. The office sends it from Lexware.'
+      : errorMessage + (detail ? ' (' + detail + ')' : '');
     $('resultNext').textContent = ok ? 'Next car' : 'Back';
     $('resultOverlay').setAttribute('data-open', 'true');
   }

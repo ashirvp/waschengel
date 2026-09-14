@@ -100,17 +100,9 @@ async function resolveCompanyContact(companyKey, { force = false } = {}) {
     email: company.billingEmailOverride,
     countryCode: (company.address && company.address.countryCode) || 'DE',
   });
-  const entry = { id: res.id, name: wanted, email: company.billingEmailOverride || null };
+  const entry = { id: res.id, name: wanted, email: null };
   memo[companyKey] = entry;
   return entry;
-}
-
-// Where this company's invoice email goes. The customer record in Lexware is
-// the default; the env override exists for sending to a shared AP inbox that
-// isn't the contact's own address.
-function billingEmailFor(companyKey, contact) {
-  const company = config.companies[companyKey] || {};
-  return company.billingEmailOverride || (contact && contact.email) || null;
 }
 
 // Resolve everything once at startup so the first invoice of the day isn't the
@@ -138,7 +130,7 @@ async function recipients() {
   for (const key of Object.keys(config.companies)) {
     try {
       const c = await resolveCompanyContact(key);
-      out[key] = { name: c.name, email: billingEmailFor(key, c) };
+      out[key] = { name: c.name, email: c.email };
     } catch {
       out[key] = null;
     }
@@ -148,7 +140,6 @@ async function recipients() {
 
 module.exports = {
   resolveCompanyContact,
-  billingEmailFor,
   warmAll,
   recipients,
   extractEmail,

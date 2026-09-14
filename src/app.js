@@ -8,7 +8,6 @@ const articles = require('./articles');
 const contacts = require('./contacts');
 const checks = require('./checks');
 const { displayPlate, isPlausiblePlate } = require('./plates');
-const { sendInvoiceEmail } = require('./mailer');
 
 const app = express();
 app.use(express.json());
@@ -212,7 +211,7 @@ function renderAdmin(report) {
 }
 
 app.post('/api/invoice', async (req, res) => {
-  const { company, licensePlate, packageKey, email } = req.body || {};
+  const { company, licensePlate, packageKey } = req.body || {};
 
   if (!company || !config.companies[company]) {
     return res.status(400).json({ error: 'Please choose a valid company.' });
@@ -247,15 +246,6 @@ app.post('/api/invoice', async (req, res) => {
     });
   }
 
-  const recipientEmail = (email && email.trim()) || contacts.billingEmailFor(company, contact);
-  if (!recipientEmail) {
-    return res.status(502).json({
-      error: `No email address for ${contact.name} in Lexware.`,
-      detail:
-        'Add a business email to that customer in Lexware, or set a billing email override in .env.',
-    });
-  }
-
   try {
     // The vehicle number is the only per-job detail, and this is the only place
     // it lives: on the invoice itself. Nothing is stored anywhere.
@@ -278,31 +268,13 @@ app.post('/api/invoice', async (req, res) => {
     const invoice = await lexware.getInvoice(created.id);
     const voucherNumber = invoice.voucherNumber || created.id;
 
-    let emailed = false;
-    let emailError = null;
-    try {
-      const pdfBuffer = await lexware.downloadInvoiceFile(created.id);
-      await sendInvoiceEmail({
-        to: recipientEmail,
-        voucherNumber,
-        plate,
-        pdfBuffer,
-      });
-      emailed = true;
-    } catch (e) {
-      // The invoice exists in Lexware even if the email fails — surface that
-      // clearly instead of pretending the whole thing failed.
-      emailError = e.message;
-      console.error('Email sending failed:', e);
-    }
-
+    // The app does not email anything: the invoice is finalised in Lexware and
+    // the office sends it from there, which keeps Lexware's own sent-status and
+    // send history correct.
     res.json({
       success: true,
       voucherNumber,
       invoiceId: created.id,
-      emailed,
-      emailError,
-      sentTo: recipientEmail,
       recipientName: contact.name,
       plate,
     });

@@ -13,10 +13,6 @@ const lexware = require('./lexware');
 const contacts = require('./contacts');
 const articles = require('./articles');
 
-function present(v) {
-  return v ? `set (${String(v).length} chars)` : 'MISSING';
-}
-
 async function runChecks() {
   const sections = [];
   let stopped = null;
@@ -31,10 +27,6 @@ async function runChecks() {
   // ------------------------------------------------------------- 1. config
   const cfg = section('Configuration');
   check(cfg, lexware.isAuthConfigured(), `Lexware auth: ${lexware.describeAuth()}`);
-  check(cfg, !!config.smtp.host, `SMTP_HOST: ${config.smtp.host || 'MISSING'}`);
-  check(cfg, !!config.smtp.user, `SMTP_USER: ${config.smtp.user || 'MISSING'}`);
-  check(cfg, !!config.smtp.pass, `SMTP_PASS: ${present(config.smtp.pass)}`);
-  check(cfg, !!config.smtp.from, `SMTP_FROM: ${config.smtp.from || 'MISSING'}`);
 
   // The app stores nothing: no database, no files, no DATA_DIR. The vehicle
   // number lives only on the invoice in Lexware, so there is no storage to
@@ -63,7 +55,7 @@ async function runChecks() {
   for (const [key, company] of Object.entries(config.companies)) {
     try {
       const c = await contacts.resolveCompanyContact(key, { force: true });
-      const email = contacts.billingEmailFor(key, c);
+      const email = c.email;
 
       // Resolving by name isn't enough: an incomplete record still produces a
       // bad invoice, or one that can never be sent.
@@ -82,7 +74,9 @@ async function runChecks() {
       } catch (e) {
         gaps.push(`could not read the full record (${e.message})`);
       }
-      if (!email) gaps.push('NO EMAIL — invoices cannot be sent');
+      // Not fatal: the app doesn't send mail. But whoever sends the invoice
+      // from Lexware needs an address on the record.
+      if (!email) gaps.push('no email on the record — the office cannot send from Lexware');
 
       check(cu, gaps.length === 0, `${company.label} -> ${c.name}`,
         `email: ${email || '(none)'}` + (gaps.length ? `\nincomplete: ${gaps.join(', ')}` : ''));
@@ -124,26 +118,6 @@ async function runChecks() {
         ? 'All allowlisted packages exist in Lexware'
         : `${missing} allowlisted package(s) match nothing in Lexware`,
       missing ? 'Fix the title in src/config.js or in Lexware so they match.' : null);
-  }
-
-  // --------------------------------------------------------------- 5. smtp
-  const sm = section('Email sending');
-  if (!config.smtp.host || !config.smtp.user || !config.smtp.pass) {
-    check(sm, false, 'SMTP is not configured', 'Invoices would be created but never emailed.');
-  } else {
-    try {
-      const nodemailer = require('nodemailer');
-      const t = nodemailer.createTransport({
-        host: config.smtp.host,
-        port: config.smtp.port,
-        secure: config.smtp.secure,
-        auth: { user: config.smtp.user, pass: config.smtp.pass },
-      });
-      await t.verify();
-      check(sm, true, `SMTP accepted the login (${config.smtp.host}:${config.smtp.port})`);
-    } catch (e) {
-      check(sm, false, 'SMTP rejected the connection', e.message);
-    }
   }
 
   return finish(sections, stopped);
