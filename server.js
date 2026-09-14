@@ -13,7 +13,7 @@ app.listen(PORT, async () => {
 
   // Resolve the Lexware customers now, so a misspelled name shows up in the
   // startup log rather than on the first job of the day.
-  if (config.lexware.apiKey) {
+  if (require('./src/lexware').isAuthConfigured()) {
     const resolved = await contacts.warmAll();
     Object.entries(resolved).forEach(([key, r]) => {
       const label = config.companies[key].label;

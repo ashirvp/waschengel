@@ -30,7 +30,7 @@ async function runChecks() {
 
   // ------------------------------------------------------------- 1. config
   const cfg = section('Configuration');
-  check(cfg, !!config.lexware.apiKey, `LEXWARE_API_KEY: ${present(config.lexware.apiKey)}`);
+  check(cfg, lexware.isAuthConfigured(), `Lexware auth: ${lexware.describeAuth()}`);
   check(cfg, !!config.smtp.host, `SMTP_HOST: ${config.smtp.host || 'MISSING'}`);
   check(cfg, !!config.smtp.user, `SMTP_USER: ${config.smtp.user || 'MISSING'}`);
   check(cfg, !!config.smtp.pass, `SMTP_PASS: ${present(config.smtp.pass)}`);
@@ -40,8 +40,8 @@ async function runChecks() {
   // number lives only on the invoice in Lexware, so there is no storage to
   // check and nothing to lose on a redeploy.
 
-  if (!config.lexware.apiKey) {
-    stopped = 'Without LEXWARE_API_KEY nothing else can be checked. Add it and run this again.';
+  if (!lexware.isAuthConfigured()) {
+    stopped = 'Without a Lexware API key nothing else can be checked. Add it and run this again.';
     return finish(sections, stopped);
   }
 

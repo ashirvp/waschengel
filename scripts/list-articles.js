@@ -17,8 +17,8 @@ function eur(n) {
 }
 
 (async () => {
-  if (!config.lexware.apiKey) {
-    console.error('LEXWARE_API_KEY is not set. Put it in .env first.');
+  if (!lexware.isAuthConfigured()) {
+    console.error('No Lexware API key. Put LEXWARE_API_KEY in .env first.');
     process.exit(1);
   }
 

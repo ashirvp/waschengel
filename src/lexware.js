@@ -3,16 +3,35 @@
 
 const config = require('./config');
 
+// An agent sandbox (Claude Code cloud sessions) can hold the API key outside
+// the VM and have its proxy attach the Authorization header after the request
+// leaves. There is then no key in the environment and we must NOT send our own
+// header. Detected rather than configured: no key AND an outbound proxy.
+// In a normal deployment there is no proxy, so a missing key still fails loudly.
+const authViaProxy = !config.lexware.apiKey && Boolean(process.env.HTTPS_PROXY || process.env.https_proxy);
+
+function isAuthConfigured() {
+  return Boolean(config.lexware.apiKey) || authViaProxy;
+}
+
+function describeAuth() {
+  if (config.lexware.apiKey) return `API key set (${String(config.lexware.apiKey).length} chars)`;
+  if (authViaProxy) return 'API key attached by the sandbox proxy (not visible to this process)';
+  return 'MISSING';
+}
+
 function headers(extra = {}) {
-  if (!config.lexware.apiKey) {
+  if (!isAuthConfigured()) {
     throw new Error('LEXWARE_API_KEY is not set. Add it to your .env file.');
   }
-  return {
-    Authorization: `Bearer ${config.lexware.apiKey}`,
+  const h = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
     ...extra,
   };
+  // Omitted on purpose when the proxy supplies it.
+  if (config.lexware.apiKey) h.Authorization = `Bearer ${config.lexware.apiKey}`;
+  return h;
 }
 
 // Lexware allows roughly 2 requests/second per API key. One invoice now costs
@@ -201,6 +220,8 @@ async function downloadInvoiceFile(invoiceId) {
 }
 
 module.exports = {
+  isAuthConfigured,
+  describeAuth,
   getProfile,
   getContact,
   listArticles,
