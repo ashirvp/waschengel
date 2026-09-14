@@ -11,6 +11,16 @@ Three companies are set up out of the box: **Lamborghini / McLaren**,
 **Ferrari**, and **Bentley**. Picking one recolors the whole screen, so a wrong
 brand color is a visible warning that you're about to invoice the wrong company.
 
+Each brand maps to the **real customer in your Lexware account** that actually
+gets billed, and the app uses that customer's own data — address, payment terms
+and email — automatically:
+
+| Staff tap | Invoice is addressed to |
+| --- | --- |
+| Ferrari | Scuderia Feser Graf GmbH |
+| Lamborghini / McLaren | Feser Sportwagen GmbH |
+| Bentley | Feser Graf Exclusive Cars GmbH |
+
 **Prices are not stored in this repo.** The service packages staff pick are the
 products (*Artikel*) in your Lexware account, fetched over the API. Change a
 price in Lexware and the app follows within ten minutes — no edit here, no
@@ -32,7 +42,10 @@ Open `.env` and fill in:
 
 - `LEXWARE_API_KEY` — the key from step 1
 - `LAMBO_MCLAREN_BILLING_EMAIL`, `FERRARI_BILLING_EMAIL`,
-  `BENTLEY_BILLING_EMAIL` — where each company's invoices go
+  `BENTLEY_BILLING_EMAIL` — **optional.** Leave these empty and each invoice
+  goes to the email on that customer's record in Lexware, which is what you
+  normally want. Set one only to redirect a company's invoices somewhere else,
+  such as a shared accounts-payable inbox.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`,
   `SMTP_FROM` — any mailbox you can send from (a normal Gmail/Outlook/company
   mailbox works; for Gmail use an
@@ -46,7 +59,9 @@ Open `.env` and fill in:
 An empty list means "offer every product in my Lexware account". To give one
 company a different menu, add a `packages: [...]` list to that company.
 
-**To change companies**, edit the `companies` block in `src/config.js`.
+**To change which customer a brand bills**, edit `contactName` for that company
+in `src/config.js`. It must match the customer's name in Lexware exactly —
+`npm run contacts` tells you whether it does.
 If you add a company there, give it a brand color by adding a
 `[data-brand="yourkey"]` block in `public/index.html`; unlisted keys fall back
 to red.
@@ -116,11 +131,25 @@ Honestly: **almost nothing.** That's the point of this setup.
    Titles are matched ignoring case, spaces and punctuation, but the wording
    must otherwise be identical — this script is how you catch a mismatch before
    your staff do.
-2. **Don't pre-create the three dealer contacts by hand.** The app creates each
-   one the first time you invoice it, and from then on looks it up by name. If
-   you create them manually, make the name match `contactName` in
-   `src/config.js` *exactly* — otherwise the app won't recognise yours and will
-   make its own alongside it.
+2. **Make sure the three dealer customers exist and are complete.** These are
+   the real customers the invoices are addressed to:
+
+   - Scuderia Feser Graf GmbH
+   - Feser Sportwagen GmbH
+   - Feser Graf Exclusive Cars GmbH
+
+   Each needs its address, VAT id, payment terms and a **business email
+   address** filled in, because the app takes all of that from Lexware. The app
+   looks them up by name and **will not create them**: if a name doesn't match,
+   it refuses to invoice and says so, rather than inventing a bare duplicate
+   with no address on a real invoice. Check with:
+
+   ```
+   npm run contacts
+   ```
+
+   This prints which Lexware customer each brand resolves to and the email its
+   invoices will go to. Run it after any rename, on either side.
 3. **Check your invoice numbering and VAT settings** in Lexware once, because
    the app takes whatever Lexware is configured to do. Each product's own VAT
    rate is used; the `taxRatePercentage` in `src/config.js` is only a fallback
@@ -173,10 +202,24 @@ record. On top of that:
   and no invoice is created while the question is open. A change of owner is a
   real thing; so is a typo, and only a human can tell them apart.
 
-**Duplicate Lexware contacts.** The app used to rely purely on a local cache
-file, which meant a host that wipes its disk on redeploy would silently create
-a second "Ferrari Dealer". Now the cache is only a shortcut: when it's empty,
-the app searches Lexware by name first and reuses the existing contact.
+**Duplicate Lexware contacts.** The app no longer creates contacts at all. It
+resolves each company to an existing customer by exact name and refuses to
+proceed on anything ambiguous:
+
+- **No match** — invoicing is blocked with the name it was looking for and the
+  closest matches it did find, so a typo is obvious.
+- **More than one customer with that name** — blocked too. It will not guess
+  which of two identically-named customers gets billed; archive or rename one.
+- **Near-misses are not matched.** "Feser Graf Exclusive Cars GmbH & Co KG" is
+  a different customer from "Feser Graf Exclusive Cars GmbH" and is never
+  substituted for it.
+
+The local cache is only a shortcut, and it is ignored whenever `contactName` in
+`src/config.js` no longer matches what was cached — so renaming a company can't
+leave you billing the old customer.
+
+(`LEXWARE_CREATE_CONTACTS=true` restores the old create-if-missing behaviour.
+Leave it off unless you're setting up a throwaway test account.)
 
 ## 6. Deploy it cheaply
 
@@ -252,17 +295,17 @@ This web app ──► vehicles.json : known plate?
    │  2. worker picks a package (only that company's packages/prices)
    │  3. taps Create Invoice
    ▼
-   ├─► Lexware API: find (or create) the company contact
+   ├─► Lexware API: find the company's customer record (never creates one)
    ├─► Lexware API: create + finalize the invoice
    ├─► Lexware API: download the invoice PDF
-   ├─► SMTP: email the PDF to the company's billing address
+   ├─► SMTP: email the PDF to that customer's address from Lexware
    └─► vehicles.json: record the visit against the plate
 ```
 
-The customer name and license plate are written straight onto the invoice as
-text, so car owners don't need to exist in Lexware at all. Only the companies
-you actually bill are Lexware contacts, because that's where the recurring
-billing relationship is.
+The car owner's name and license plate are written straight onto the invoice as
+text, so car owners don't need to exist in Lexware at all. Only the three dealer
+companies are Lexware customers, because that's where the recurring billing
+relationship is.
 
 ## Project layout
 
@@ -270,7 +313,9 @@ billing relationship is.
 | --- | --- |
 | `src/config.js` | companies, and which Lexware products staff may pick |
 | `src/articles.js` | fetches the packages/prices from Lexware, caches, falls back |
-| `scripts/list-articles.js` | `npm run articles` — check your titles match |
+| `src/contacts.js` | resolves each company to its real Lexware customer |
+| `scripts/list-articles.js` | `npm run articles` — check your product titles match |
+| `scripts/list-contacts.js` | `npm run contacts` — check your customers resolve |
 | `src/plates.js` | plate normalization; the basis of duplicate detection |
 | `src/store.js` | the vehicle registry (plate → customer, company, history) |
 | `src/lexware.js` | Lexware API calls, contact dedupe, rate limiting |
@@ -289,6 +334,16 @@ billing relationship is.
   within ten minutes (restart to apply immediately).
 - **A package is missing from the app** — its title in `packageAllowlist`
   doesn't match the product in Lexware. Run `npm run articles` to see which.
+- **"Could not find the Lexware customer for …"** — `contactName` in
+  `src/config.js` doesn't match a customer in Lexware. Run `npm run contacts`;
+  the message also lists the closest names it found.
+- **"Lexware has 2 customers named …"** — two customer records share that name.
+  Archive or rename one; the app won't guess which to bill.
+- **"No email address for … in Lexware"** — that customer has no business email
+  on file. Add one in Lexware, or set the company's billing-email override
+  in `.env`.
+- **The app shows "Customer not found in Lexware" under a company** — same
+  cause; staff should not invoice that company until it's fixed.
 - **Amber "prices could not be loaded from Lexware"** — the app is showing its
   built-in fallback prices. Check `LEXWARE_API_KEY` and that the account's plan
   includes API access.

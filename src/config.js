@@ -64,10 +64,19 @@ module.exports = {
 
   // --- YOUR CUSTOMER COMPANIES ----------------------------------------------
   //
+  // Each entry is ONE button in the app, mapped to a REAL customer in Lexware.
+  //
   // key          : short internal id (lowercase, no spaces). Don't reuse one.
-  // label        : what staff see on the button.
-  // billingEmail : every invoice for this company goes to this address.
-  // contactName  : the customer name as it should appear in Lexware.
+  // label        : what staff see on the button (the car brand they're holding).
+  // contactName  : the customer's name in Lexware, spelled EXACTLY as it is
+  //                there. The app looks this up and bills that customer, using
+  //                its address, payment terms and email from Lexware. If it
+  //                doesn't match a customer, the app says so instead of
+  //                inventing one — run `npm run contacts` to check.
+  // billingEmailOverride
+  //              : OPTIONAL. By default the invoice goes to the email on the
+  //                Lexware customer record. Set this only to send somewhere
+  //                else, e.g. a shared accounts-payable inbox.
   // packages     : OPTIONAL. Omit it and the company offers packageAllowlist
   //                above (the same list for every car). Set it to a list of
   //                titles to give one company a different menu.
@@ -75,25 +84,30 @@ module.exports = {
   companies: {
     lambo_mclaren: {
       label: 'Lamborghini / McLaren',
-      billingEmail: process.env.LAMBO_MCLAREN_BILLING_EMAIL || 'invoices@company-one.com',
-      contactName: 'Lamborghini / McLaren Dealer',
+      contactName: 'Feser Sportwagen GmbH',
+      billingEmailOverride: process.env.LAMBO_MCLAREN_BILLING_EMAIL || null,
       address: { countryCode: 'DE' },
     },
 
     ferrari: {
       label: 'Ferrari',
-      billingEmail: process.env.FERRARI_BILLING_EMAIL || 'invoices@company-two.com',
-      contactName: 'Ferrari Dealer',
+      contactName: 'Scuderia Feser Graf GmbH',
+      billingEmailOverride: process.env.FERRARI_BILLING_EMAIL || null,
       address: { countryCode: 'DE' },
     },
 
     bentley: {
       label: 'Bentley',
-      billingEmail: process.env.BENTLEY_BILLING_EMAIL || 'invoices@company-three.com',
-      contactName: 'Bentley Dealer',
+      contactName: 'Feser Graf Exclusive Cars GmbH',
+      billingEmailOverride: process.env.BENTLEY_BILLING_EMAIL || null,
       address: { countryCode: 'DE' },
     },
   },
+
+  // The app bills customers that already exist in Lexware. Leave this off: if a
+  // name doesn't match, you want to be told, not to get a bare duplicate
+  // contact with no address on a real invoice.
+  allowContactCreation: process.env.LEXWARE_CREATE_CONTACTS === 'true',
 
   // Only used if an article somehow has no tax rate of its own.
   taxRatePercentage: 19,

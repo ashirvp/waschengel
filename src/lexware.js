@@ -1,7 +1,6 @@
 // Thin wrapper around the Lexware (formerly lexoffice) public API.
 // Docs: https://developers.lexware.io/docs/
 
-const fs = require('fs');
 const config = require('./config');
 
 function headers(extra = {}) {
@@ -63,21 +62,6 @@ async function lexFetch(pathname, options = {}, attempt = 0) {
   return res;
 }
 
-// --- Contact cache (so we create each company's contact only once) -------
-
-function readContactCache() {
-  try {
-    return JSON.parse(fs.readFileSync(config.contactCacheFile, 'utf8'));
-  } catch {
-    return {};
-  }
-}
-
-function writeContactCache(cache) {
-  fs.mkdirSync(require('path').dirname(config.contactCacheFile), { recursive: true });
-  fs.writeFileSync(config.contactCacheFile, JSON.stringify(cache, null, 2));
-}
-
 // Searches Lexware contacts. The `name` filter is a substring match and needs
 // at least 3 characters, so shorter queries are not worth a round trip.
 async function searchContacts(query, { page = 0, size = 25 } = {}) {
@@ -102,68 +86,23 @@ function contactDisplayName(contact) {
   return '';
 }
 
-// Finds (via cache, then via the Lexware API) or creates the Lexware contact
-// for a given company key and returns its contactId.
-//
-// The local cache used to be the ONLY guard against duplicates, which meant a
-// host that wipes the disk on redeploy silently created a second "Ferrari
-// Dealer" on the next invoice. Now the cache is just a shortcut: when it's
-// empty we ask Lexware whether the contact already exists before creating one.
-async function getOrCreateCompanyContact(companyKey) {
-  const cache = readContactCache();
-  if (cache[companyKey]) {
-    return cache[companyKey];
-  }
-
-  const company = config.companies[companyKey];
-  if (!company) throw new Error(`Unknown company "${companyKey}"`);
-
-  const wantedName = company.contactName || company.label;
-
-  // Ask Lexware first. A name collision here is what we want: it means the
-  // contact survived a redeploy even though our cache file did not.
-  try {
-    const matches = await searchContacts(wantedName);
-    const exact = matches.find(
-      (c) => contactDisplayName(c).trim().toLowerCase() === wantedName.trim().toLowerCase()
-    );
-    if (exact) {
-      cache[companyKey] = exact.id;
-      writeContactCache(cache);
-      return exact.id;
-    }
-  } catch (e) {
-    // A failed search must not block invoicing. Worst case we fall through and
-    // create the contact, which is the old behaviour.
-    console.error('Contact search failed, falling back to create:', e.message);
-  }
-
+// Creates a contact. Only used by the opt-in escape hatch in contacts.js —
+// normal operation looks up customers you already have in Lexware.
+async function createContact({ name, email, countryCode = 'DE' }) {
   const body = {
     version: 0,
     roles: { customer: {} },
-    company: { name: wantedName },
-    emailAddresses: {
-      business: [company.billingEmail],
-    },
-    addresses: {
-      billing: [
-        {
-          countryCode: company.address.countryCode,
-        },
-      ],
-    },
+    company: { name },
+    addresses: { billing: [{ countryCode }] },
   };
+  if (email) body.emailAddresses = { business: [email] };
 
   const res = await lexFetch('/contacts', {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify(body),
   });
-  const data = await res.json();
-
-  cache[companyKey] = data.id;
-  writeContactCache(cache);
-  return data.id;
+  return res.json();
 }
 
 // Lists the products/services ("Artikel") from Lexware. These are the service
@@ -248,9 +187,9 @@ async function downloadInvoiceFile(invoiceId) {
 }
 
 module.exports = {
-  getOrCreateCompanyContact,
   listArticles,
   searchContacts,
+  createContact,
   contactDisplayName,
   createInvoice,
   getInvoice,

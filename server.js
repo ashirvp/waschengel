@@ -4,6 +4,7 @@ const path = require('path');
 const config = require('./src/config');
 const lexware = require('./src/lexware');
 const articles = require('./src/articles');
+const contacts = require('./src/contacts');
 const store = require('./src/store');
 const { normalizePlate, displayPlate, isPlausiblePlate } = require('./src/plates');
 const { sendInvoiceEmail } = require('./src/mailer');
@@ -32,6 +33,10 @@ app.get('/api/config', async (req, res) => {
         key,
         {
           label: c.label,
+          // Who the invoice is actually addressed to, straight from Lexware.
+          // Null until it resolves, so the UI can flag an unresolved company
+          // rather than let someone invoice into the dark.
+          recipient: contacts.cachedRecipient(key),
           packages: packagesFor(c).map((p) => ({
             key: p.key,
             label: p.title,
@@ -174,10 +179,31 @@ app.post('/api/invoice', async (req, res) => {
   }
 
   const companyConfig = config.companies[company];
-  const recipientEmail = (email && email.trim()) || companyConfig.billingEmail;
+
+  let contact;
+  try {
+    contact = await contacts.resolveCompanyContact(company);
+  } catch (err) {
+    // A missing or ambiguous customer is a setup problem, not a transient one.
+    // Say exactly what's wrong instead of burying it in a generic failure.
+    console.error('Contact resolution failed:', err.message);
+    return res.status(502).json({
+      error: `Could not find the Lexware customer for ${companyConfig.label}.`,
+      detail: err.message,
+    });
+  }
+
+  const recipientEmail = (email && email.trim()) || contacts.billingEmailFor(company, contact);
+  if (!recipientEmail) {
+    return res.status(502).json({
+      error: `No email address for ${contact.name} in Lexware.`,
+      detail:
+        'Add a business email to that customer in Lexware, or set a billing email override in .env.',
+    });
+  }
 
   try {
-    const contactId = await lexware.getOrCreateCompanyContact(company);
+    const contactId = contact.id;
 
     const introduction = `${pkg.title} — ${cleanName} — Plate: ${displayPlate(licensePlate)}`;
 
@@ -221,7 +247,7 @@ app.post('/api/invoice', async (req, res) => {
       const pdfBuffer = await lexware.downloadInvoiceFile(created.id);
       await sendInvoiceEmail({
         to: recipientEmail,
-        companyLabel: companyConfig.label,
+        companyLabel: contact.name || companyConfig.label,
         voucherNumber,
         pdfBuffer,
       });
@@ -240,6 +266,7 @@ app.post('/api/invoice', async (req, res) => {
       emailed,
       emailError,
       sentTo: recipientEmail,
+      recipientName: contact.name,
       plate: displayPlate(licensePlate),
       plateKey,
       visits: vehicle ? vehicle.visits : null,
@@ -254,7 +281,23 @@ app.post('/api/invoice', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Garage invoice app running on http://localhost:${PORT}`);
   console.log(`Vehicle registry: ${config.vehicleFile}`);
+
+  // Resolve the Lexware customers now, so a misspelled name shows up in the
+  // startup log rather than on the first invoice of the day.
+  if (config.lexware.apiKey) {
+    const resolved = await contacts.warmAll();
+    Object.entries(resolved).forEach(([key, r]) => {
+      const label = config.companies[key].label;
+      console.log(
+        r.error
+          ? `  ${label}: NOT RESOLVED — ${r.error}`
+          : `  ${label} -> ${r.name}${r.email ? ' <' + r.email + '>' : ' (no email on file)'}`
+      );
+    });
+  } else {
+    console.log('  LEXWARE_API_KEY is not set; customers will resolve on first use.');
+  }
 });

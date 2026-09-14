@@ -198,6 +198,23 @@
   .package-btn .price { font-size: 17px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
   .package-btn .gross { display: block; font-size: 11px; font-weight: 500; color: var(--muted-2); }
 
+  /* Who the invoice is actually addressed to. Staff pick a car brand, but the
+     bill goes to a differently-named dealer company — showing it removes the
+     guesswork and catches a wrong pick before the invoice goes out. */
+  .recipient {
+    display: none; margin-top: 12px; padding: 10px 12px;
+    border-radius: 10px; background: var(--card-2); border: 1px solid var(--line);
+    font-size: 13px;
+  }
+  .recipient .tag {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--muted-2); margin-bottom: 2px;
+  }
+  .recipient .who { font-weight: 600; }
+  .recipient .mail { color: var(--muted); font-size: 12px; margin-top: 1px; word-break: break-all; }
+  .recipient.bad { background: rgba(239,75,82,.10); border-color: rgba(239,75,82,.35); }
+  .recipient.bad .who { color: var(--err); font-weight: 600; }
+
   .pricewarn {
     display: none; margin: 0 0 12px; padding: 10px 12px;
     border-radius: 10px; font-size: 13px;
@@ -306,6 +323,7 @@
 
     <label class="field" style="margin-top:14px">Company to invoice</label>
     <div class="company-grid" id="companyGrid"></div>
+    <div class="recipient" id="recipient"></div>
   </section>
 
   <!-- STEP 3 — packages come from the selected company only. -->
@@ -418,8 +436,46 @@
     if (!stillValid) state.packageKey = null;
 
     renderCompanies();
+    renderRecipient();
     renderPackages();
     refreshAction();
+  }
+
+  // Shows the Lexware customer this company bills to, so nobody has to
+  // remember that "Ferrari" means "Scuderia Feser Graf GmbH".
+  function renderRecipient() {
+    var box = $('recipient');
+    var company = CONFIG.companies[state.company];
+    if (!company) { box.style.display = 'none'; return; }
+
+    box.innerHTML = '';
+    var tag = document.createElement('div');
+    tag.className = 'tag';
+    tag.textContent = 'Invoice goes to';
+    box.appendChild(tag);
+
+    var who = document.createElement('div');
+    who.className = 'who';
+    if (company.recipient && company.recipient.name) {
+      box.className = 'recipient';
+      who.textContent = company.recipient.name;
+      box.appendChild(who);
+      var mail = document.createElement('div');
+      mail.className = 'mail';
+      mail.textContent = company.recipient.email || 'no email on file — invoice cannot be sent';
+      box.appendChild(mail);
+    } else {
+      // Unresolved means the name in config doesn't match a Lexware customer.
+      // Better to say so here than to fail at the moment of invoicing.
+      box.className = 'recipient bad';
+      who.textContent = 'Customer not found in Lexware';
+      box.appendChild(who);
+      var hint = document.createElement('div');
+      hint.className = 'mail';
+      hint.textContent = 'Tell the office before invoicing this company.';
+      box.appendChild(hint);
+    }
+    box.style.display = 'block';
   }
 
   // ---- Packages ----------------------------------------------------------
@@ -728,7 +784,7 @@
     $('successTitle').textContent = body.emailed ? 'Invoice sent' : 'Invoice created';
     $('successVoucher').textContent = body.voucherNumber || '';
     $('successDetail').textContent = body.emailed
-      ? 'Emailed to ' + body.sentTo
+      ? 'Emailed to ' + (body.recipientName ? body.recipientName + ' (' + body.sentTo + ')' : body.sentTo)
       : 'Saved in Lexware, but the email did not go out. Tell the office.';
     $('successNext').textContent = 'Next car';
     $('successOverlay').setAttribute('data-open', 'true');
