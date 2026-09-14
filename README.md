@@ -258,35 +258,42 @@ Leave it off unless you're setting up a throwaway test account.)
 
 ## 7. Deploy it cheaply
 
-This is a small Node server that **needs a real disk**, so it needs somewhere
-that can run Node, hold your secrets, and keep a file between restarts.
+### Deploying to Vercel
 
-> **Vercel, Netlify and AWS Lambda will not work as-is.** They are serverless:
-> the filesystem is read-only apart from `/tmp`, and `/tmp` is wiped between
-> requests. The app would still create invoices, but the vehicle registry could
-> never persist, so **every car would be forgotten immediately** and the plate
-> lookup — the whole point of the redesign — would never find anything.
-> `npm run doctor` detects this and says so.
->
-> To use Vercel anyway, the registry has to move out of the filesystem and into
-> a hosted database (Vercel KV, Upstash and Neon all have free tiers). That's a
-> change to `src/store.js`; ask if you want it.
+Vercel works, but it needs two things that are easy to miss, and both fail
+**silently** — the page loads and looks fine either way.
 
-It also can't go on a purely static host like GitHub Pages, because the Lexware
-API key must never reach the browser.
+**1. `api/index.js` and `vercel.json`** (already in this repo). Vercel doesn't
+run `npm start`; it imports a handler. Without these, Vercel serves
+`public/index.html` as a plain static file and every `/api/…` call 404s, so the
+screen appears but nothing on it works.
 
-Traffic here is tiny (a handful of invoices a day), so the cheapest tiers are
-plenty. In rough order of cost:
+**2. Redis for the vehicle registry.** Serverless functions have no disk that
+survives a request, so the plate lookup would forget every car immediately.
+Create a free Redis database (Vercel's own Marketplace → Upstash, or
+[upstash.com](https://upstash.com) directly — the free tier is far more than a
+garage needs) and set these in the Vercel project's environment variables:
 
-| Option | Cost | Trade-off |
-| --- | --- | --- |
-| **Fly.io**, one machine + small volume | Often free at this size | Real disk, auto-stops when idle |
-| **Render**, free web service | Free | Sleeps after ~15 min idle; first request after a nap takes ~30–60s |
-| **Fly.io**, one small machine | A few € / month | Can auto-stop when idle, so you pay close to nothing |
-| **Railway** | A few € / month | Simplest setup, always awake |
-| **A VPS you already own** | € 0 extra | You manage Node, restarts, and TLS yourself |
+```
+KV_REST_API_URL     = https://....upstash.io
+KV_REST_API_TOKEN   = ....
+```
 
-Prices and free tiers change — check the provider before committing.
+`UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` work too. The app picks
+Redis up automatically when they're present and falls back to a file otherwise,
+so the same code runs on both kinds of host. `npm run doctor` and `/admin` both
+report which driver is in use and whether it will survive a restart.
+
+Then set the rest of the environment variables (`LEXWARE_API_KEY`, the `SMTP_*`
+values, `ADMIN_TOKEN`) in the same place and redeploy.
+
+### Hosts with a real disk
+
+On Fly.io, Render or a VPS, no Redis is needed — set `DATA_DIR` to a mounted
+volume and the app uses a JSON file.
+
+This app also can't go on a purely static host like GitHub Pages, because the
+Lexware API key must never reach the browser.
 
 The steps are the same everywhere:
 
@@ -314,6 +321,11 @@ Everything the app must remember lives in one directory, set by `DATA_DIR`
 **Render's free tier and Railway without a volume both reset the disk on every
 deploy and restart.** Before the plate lookup existed that was merely untidy;
 now it would wipe your customer history. So:
+
+**On a serverless host (Vercel, Netlify, Lambda):** use Redis instead — see the
+Vercel section below. There's no disk to mount.
+
+**On a host with a real disk:**
 
 1. Add a small persistent disk / volume in your host's settings (about €1 a
    month on most; Fly.io's smallest volume is free at the time of writing)
@@ -368,7 +380,10 @@ relationship is.
 | `src/checks.js` | the setup checks, shared by `npm run doctor` and `/admin` |
 | `scripts/doctor.js` | `npm run doctor` — check everything at once |
 | `src/plates.js` | plate normalization; the basis of duplicate detection |
-| `src/store.js` | the vehicle registry (plate → customer, company, history) |
+| `src/app.js` | the Express app and all its routes |
+| `server.js` | starts the app on a normal host |
+| `api/index.js` | the same app, as a Vercel/serverless handler |
+| `src/store/` | the vehicle registry — `redis.js` or `file.js`, chosen automatically |
 | `src/lexware.js` | Lexware API calls, contact dedupe, rate limiting |
 | `src/mailer.js` | sending the invoice PDF over SMTP |
 | `server.js` | HTTP endpoints and the invoice flow |

@@ -14,6 +14,7 @@ const config = require('./config');
 const lexware = require('./lexware');
 const contacts = require('./contacts');
 const articles = require('./articles');
+const store = require('./store');
 
 function present(v) {
   return v ? `set (${String(v).length} chars)` : 'MISSING';
@@ -40,45 +41,52 @@ async function runChecks() {
 
   // ------------------------------------------------------------ 2. storage
   const st = section('Storage (the vehicle registry)');
-  st.notes.push(`DATA_DIR: ${config.dataDir}`);
+  const where = store.describe();
+  st.notes.push(`Driver: ${where.detail}`);
 
-  // Serverless hosts give you a read-only app directory and a /tmp that is
-  // wiped between invocations. The plate lookup cannot survive there.
-  const serverless =
-    (process.env.VERCEL && 'Vercel') ||
-    (process.env.AWS_LAMBDA_FUNCTION_NAME && 'AWS Lambda') ||
-    (process.env.NETLIFY && 'Netlify') ||
-    (process.env.K_SERVICE && 'Cloud Run');
-  if (serverless) {
-    check(st, false, `Running on ${serverless} (serverless)`,
-      'The filesystem is wiped between requests, so the vehicle registry cannot persist.\n' +
-      'Invoices would still work, but every car would be forgotten immediately and the\n' +
-      'plate lookup would never find anything. Use a host with a real disk, or move the\n' +
-      'registry to a hosted database.');
+  if (where.persistent) {
+    check(st, true, `Registry will survive restarts (${where.driver})`);
+  } else {
+    check(st, false, 'The vehicle registry CANNOT persist on this host',
+      'This is a serverless host (Vercel/Lambda/Netlify/Cloud Run): the filesystem is\n' +
+      'wiped between requests. Invoices would still work, but every car would be\n' +
+      'forgotten immediately and the plate lookup would never find anything.\n' +
+      'Fix: set KV_REST_API_URL and KV_REST_API_TOKEN (or the UPSTASH_ equivalents),\n' +
+      'or move to a host with a real disk.');
   }
 
-  let writable = false;
   try {
-    fs.mkdirSync(config.dataDir, { recursive: true });
-    const probe = path.join(config.dataDir, '.doctor-probe');
-    fs.writeFileSync(probe, 'ok');
-    fs.unlinkSync(probe);
-    writable = true;
-    check(st, true, 'DATA_DIR is writable');
+    const msg = await store.healthcheck();
+    check(st, true, msg);
   } catch (e) {
-    check(st, false, 'DATA_DIR is not writable', e.message);
+    check(st, false, 'The registry is not reachable', e.message);
   }
 
-  if (writable && !serverless && /^\/tmp(\/|$)|^\/var\/tmp(\/|$)/.test(path.resolve(config.dataDir))) {
-    check(st, false, 'DATA_DIR is under /tmp',
-      'Most hosts clear /tmp on restart. Point DATA_DIR at a mounted volume.');
+  // A file driver on a normal host still needs a directory that outlives a deploy.
+  if (where.driver === 'file') {
+    let writable = false;
+    try {
+      fs.mkdirSync(config.dataDir, { recursive: true });
+      const probe = path.join(config.dataDir, '.doctor-probe');
+      fs.writeFileSync(probe, 'ok');
+      fs.unlinkSync(probe);
+      writable = true;
+      check(st, true, `DATA_DIR is writable (${config.dataDir})`);
+    } catch (e) {
+      check(st, false, `DATA_DIR is not writable (${config.dataDir})`, e.message);
+    }
+    if (writable && where.persistent &&
+        /^\/tmp(\/|$)|^\/var\/tmp(\/|$)/.test(path.resolve(config.dataDir))) {
+      check(st, false, 'DATA_DIR is under /tmp',
+        'Most hosts clear /tmp on restart. Point DATA_DIR at a mounted volume.');
+    }
   }
 
   try {
-    const v = JSON.parse(fs.readFileSync(config.vehicleFile, 'utf8'));
-    st.notes.push(`Vehicles on file: ${Object.keys(v.vehicles || {}).length}`);
+    const s2 = await store.stats();
+    st.notes.push(`Vehicles on file: ${s2.vehicles} (${s2.visits} visits recorded)`);
   } catch {
-    st.notes.push('Vehicles on file: 0 (no registry yet — normal before the first invoice)');
+    st.notes.push('Vehicles on file: could not be read');
   }
 
   if (!config.lexware.apiKey) {

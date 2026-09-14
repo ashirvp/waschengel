@@ -44,12 +44,19 @@ function readCache() {
   return memo;
 }
 
+let cacheWriteWarned = false;
+
 function writeCache() {
   try {
     fs.mkdirSync(path.dirname(config.contactCacheFile), { recursive: true });
     fs.writeFileSync(config.contactCacheFile, JSON.stringify(readCache(), null, 2));
   } catch (e) {
-    console.error('Could not save the contact cache:', e.message);
+    // Read-only filesystems (Vercel, Lambda) can't keep this. It's only a
+    // cache, so carry on — but say so once rather than on every resolve.
+    if (!cacheWriteWarned) {
+      cacheWriteWarned = true;
+      console.warn(`Contact cache is not writable (${e.message}). Continuing without it.`);
+    }
   }
 }
 
@@ -155,20 +162,29 @@ async function warmAll() {
   return out;
 }
 
-// Best-effort view for the UI; never throws, never triggers a fetch.
-function cachedRecipient(companyKey) {
-  const hit = readCache()[companyKey];
-  const company = config.companies[companyKey] || {};
-  if (!hit || !hit.id) return null;
-  if (normalizeName(hit.name) !== normalizeName(company.contactName)) return null;
-  return { name: hit.name, email: billingEmailFor(companyKey, hit) };
+// Who each company bills, for the UI. Resolves if it has to — on a serverless
+// host the cache file never persists, so a cache-only view would show every
+// company as "not found" even when they all resolve perfectly.
+// Never throws: an unresolvable company comes back as null and is flagged
+// on screen rather than breaking the page.
+async function recipients() {
+  const out = {};
+  for (const key of Object.keys(config.companies)) {
+    try {
+      const c = await resolveCompanyContact(key);
+      out[key] = { name: c.name, email: billingEmailFor(key, c) };
+    } catch {
+      out[key] = null;
+    }
+  }
+  return out;
 }
 
 module.exports = {
   resolveCompanyContact,
   billingEmailFor,
   warmAll,
-  cachedRecipient,
+  recipients,
   extractEmail,
   ContactError,
   _reset: () => { memo = null; },
