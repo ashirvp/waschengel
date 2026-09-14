@@ -284,7 +284,6 @@ app.post('/api/invoice', async (req, res) => {
       const pdfBuffer = await lexware.downloadInvoiceFile(created.id);
       await sendInvoiceEmail({
         to: recipientEmail,
-        companyLabel: contact.name || companyConfig.label,
         voucherNumber,
         plate,
         pdfBuffer,

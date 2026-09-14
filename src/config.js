@@ -108,6 +108,20 @@ module.exports = {
   // Only used if an article somehow has no tax rate of its own.
   taxRatePercentage: 19,
 
+  // --- YOUR BUSINESS -------------------------------------------------------
+  // Used as the sender name and the signature under the invoice email, so it
+  // matches your Lexware letterhead. Public business details (the same ones on
+  // your Impressum), not secrets.
+  business: {
+    name: process.env.BUSINESS_NAME || 'Waschengel GmbH',
+    street: process.env.BUSINESS_STREET || 'Äußere Sulzbacher Straße 23',
+    zip: process.env.BUSINESS_ZIP || '90491',
+    city: process.env.BUSINESS_CITY || 'Nürnberg',
+    phone: process.env.BUSINESS_PHONE || '09131/1239258',
+    email: process.env.BUSINESS_EMAIL || 'info@waschengel.info',
+    web: process.env.BUSINESS_WEB || 'www.waschengel.de',
+  },
+
   // Outgoing email (SMTP) used to send the finished invoice PDF.
   smtp: {
     host: process.env.SMTP_HOST,

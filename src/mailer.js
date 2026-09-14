@@ -20,17 +20,50 @@ function getTransporter() {
   return transporter;
 }
 
-async function sendInvoiceEmail({ to, companyLabel, voucherNumber, plate, pdfBuffer }) {
+// The signature under the email, matching the letterhead on the invoice itself
+// so the two look like they came from the same place.
+function signature() {
+  const b = config.business;
+  return [
+    b.name,
+    b.street,
+    `${b.zip} ${b.city}`,
+    b.phone ? `Tel.: ${b.phone}` : null,
+    b.email,
+    b.web,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+// The recipients are German dealerships, and the attached invoice is a German
+// document — so the mail that carries it is German too.
+async function sendInvoiceEmail({ to, voucherNumber, plate, pdfBuffer }) {
+  const b = config.business;
+
+  const body = [
+    'Guten Tag,',
+    '',
+    `anbei erhalten Sie unsere Rechnung ${voucherNumber}` +
+      (plate ? ` für das Fahrzeug ${plate}.` : '.'),
+    '',
+    'Mit freundlichen Grüßen',
+    b.name,
+    '',
+    '--',
+    signature(),
+  ].join('\n');
+
   await getTransporter().sendMail({
-    from: config.smtp.from,
+    // Show the company name next to the address, so the dealer's inbox shows
+    // "Waschengel GmbH" rather than a bare mailbox address.
+    from: { name: b.name, address: config.smtp.from },
     to,
-    subject: `Invoice ${voucherNumber} — ${companyLabel}${plate ? ' — ' + plate : ''}`,
-    text:
-      `Please find attached invoice ${voucherNumber}.` +
-      (plate ? `\n\nVehicle: ${plate}` : ''),
+    subject: `Rechnung ${voucherNumber}${plate ? ` – Fahrzeug ${plate}` : ''}`,
+    text: body,
     attachments: [
       {
-        filename: `${voucherNumber}.pdf`,
+        filename: `Rechnung-${voucherNumber}.pdf`,
         content: pdfBuffer,
         contentType: 'application/pdf',
       },

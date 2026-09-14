@@ -42,8 +42,10 @@ cp .env.example .env
 Open `.env` and fill in:
 
 - `LEXWARE_API_KEY` — the key from step 1
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`,
-  `SMTP_FROM` — any mailbox you can send from (a normal Gmail/Outlook/company
+- `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` — the mailbox the invoice email is
+  sent from. Use the address on your letterhead (`info@waschengel.info`) so the
+  email and the invoice match. `SMTP_PORT` (587), `SMTP_SECURE` (false) and
+  `SMTP_FROM` (same as `SMTP_USER`) have defaults and can be left out (a normal Gmail/Outlook/company
   mailbox works; for Gmail use an
   [app password](https://support.google.com/accounts/answer/185833), not your
   normal password)
@@ -303,10 +305,41 @@ is.
 | `src/articles.js` | fetches packages/prices from Lexware, caches, falls back |
 | `src/contacts.js` | resolves each company to its real Lexware customer |
 | `src/lexware.js` | Lexware API calls and rate limiting |
-| `src/mailer.js` | sending the invoice PDF over SMTP |
+| `src/mailer.js` | the German invoice email and your letterhead signature |
 | `src/plates.js` | tidying the vehicle number for the invoice |
 | `src/checks.js` | the setup checks, shared by `npm run doctor` and `/admin` |
 | `public/index.html` | the whole mobile UI, no build step |
+
+## The invoice email
+
+The email is German, since the recipients are German dealerships and the
+attached invoice is a German document:
+
+```
+From:    Waschengel GmbH <info@waschengel.info>
+Subject: Rechnung RE-2026-0001 – Fahrzeug M-AB 1234
+
+Guten Tag,
+
+anbei erhalten Sie unsere Rechnung RE-2026-0001 für das Fahrzeug M-AB 1234.
+
+Mit freundlichen Grüßen
+Waschengel GmbH
+--
+Waschengel GmbH
+Äußere Sulzbacher Straße 23
+90491 Nürnberg
+...
+```
+
+The signature comes from the `business` block in `src/config.js`, which should
+match your Lexware letterhead. Every field can be overridden with a
+`BUSINESS_*` environment variable.
+
+**Lexware itself does not send the email.** Its public API creates the invoice
+and gives you the PDF, but has no endpoint to mail a document, so this app does
+the sending. That means `SMTP_FROM` decides what the dealer sees as the sender
+— set it to the address on your letterhead.
 
 ## Security
 
