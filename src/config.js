@@ -32,13 +32,45 @@ module.exports = {
   // is the one piece of data the app owns itself.
   vehicleFile: path.join(DATA_DIR, 'vehicles.json'),
 
-  // --- YOUR THREE CUSTOMER COMPANIES ---------------------------------------
+  // --- SERVICE PACKAGES -----------------------------------------------------
+  //
+  // The packages staff can pick are your PRODUCTS IN LEXWARE (Artikel). Prices
+  // and descriptions are fetched from there, so changing a price in Lexware is
+  // enough — no edit here, no redeploy.
+  //
+  // This list says WHICH of your Lexware products staff may pick, and in what
+  // order. Titles are matched loosely (case, spaces and punctuation are
+  // ignored), but the wording must otherwise match the article in Lexware.
+  // Run `npm run articles` to print exactly what your account has.
+  //
+  // Empty list = show every article in your Lexware account.
+  packageAllowlist: [
+    'Complete Ferrari NW',
+    'Complete GW',
+    'Complete NW',
+    'Servicewäsche Basic',
+    'Servicewäsche Plus',
+  ],
+
+  // How long a fetched price list is reused before checking Lexware again.
+  articleCacheMs: Number(process.env.ARTICLE_CACHE_MS || 10 * 60 * 1000),
+
+  // Put the Lexware article id on the invoice line instead of writing it as a
+  // free-text line. Better bookkeeping (revenue per product), but the exact
+  // payload is not something this app can verify against your account, so it
+  // is OFF by default. Turn it on, send ONE test invoice, and check it looks
+  // right in Lexware before relying on it.
+  linkArticlesOnInvoice: process.env.LEXWARE_LINK_ARTICLES === 'true',
+
+  // --- YOUR CUSTOMER COMPANIES ----------------------------------------------
   //
   // key          : short internal id (lowercase, no spaces). Don't reuse one.
   // label        : what staff see on the button.
   // billingEmail : every invoice for this company goes to this address.
   // contactName  : the customer name as it should appear in Lexware.
-  // packages     : this company's own services and prices (net, EUR).
+  // packages     : OPTIONAL. Omit it and the company offers packageAllowlist
+  //                above (the same list for every car). Set it to a list of
+  //                titles to give one company a different menu.
   //
   companies: {
     lambo_mclaren: {
@@ -46,13 +78,6 @@ module.exports = {
       billingEmail: process.env.LAMBO_MCLAREN_BILLING_EMAIL || 'invoices@company-one.com',
       contactName: 'Lamborghini / McLaren Dealer',
       address: { countryCode: 'DE' },
-      packages: [
-        { key: 'basic_wash', label: 'Basic Wash', netPrice: 30 },
-        { key: 'premium_wash', label: 'Premium Wash', netPrice: 55 },
-        { key: 'interior_cleaning', label: 'Interior Cleaning', netPrice: 70 },
-        { key: 'smart_repair', label: 'Smart Repair', netPrice: 180 },
-        { key: 'ceramic_coating', label: 'Ceramic Coating', netPrice: 450 },
-      ],
     },
 
     ferrari: {
@@ -60,13 +85,6 @@ module.exports = {
       billingEmail: process.env.FERRARI_BILLING_EMAIL || 'invoices@company-two.com',
       contactName: 'Ferrari Dealer',
       address: { countryCode: 'DE' },
-      packages: [
-        { key: 'basic_wash', label: 'Basic Wash', netPrice: 25 },
-        { key: 'premium_wash', label: 'Premium Wash', netPrice: 45 },
-        { key: 'interior_cleaning', label: 'Interior Cleaning', netPrice: 60 },
-        { key: 'smart_repair', label: 'Smart Repair', netPrice: 150 },
-        { key: 'ceramic_coating', label: 'Ceramic Coating', netPrice: 400 },
-      ],
     },
 
     bentley: {
@@ -74,16 +92,10 @@ module.exports = {
       billingEmail: process.env.BENTLEY_BILLING_EMAIL || 'invoices@company-three.com',
       contactName: 'Bentley Dealer',
       address: { countryCode: 'DE' },
-      packages: [
-        { key: 'basic_wash', label: 'Basic Wash', netPrice: 35 },
-        { key: 'premium_wash', label: 'Premium Wash', netPrice: 60 },
-        { key: 'interior_cleaning', label: 'Interior Cleaning', netPrice: 80 },
-        { key: 'smart_repair', label: 'Smart Repair', netPrice: 200 },
-        { key: 'ceramic_coating', label: 'Ceramic Coating', netPrice: 500 },
-      ],
     },
   },
 
+  // Only used if an article somehow has no tax rate of its own.
   taxRatePercentage: 19,
 
   // Outgoing email (SMTP) used to send the finished invoice PDF.

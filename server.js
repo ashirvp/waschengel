@@ -3,6 +3,7 @@ const express = require('express');
 const path = require('path');
 const config = require('./src/config');
 const lexware = require('./src/lexware');
+const articles = require('./src/articles');
 const store = require('./src/store');
 const { normalizePlate, displayPlate, isPlausiblePlate } = require('./src/plates');
 const { sendInvoiceEmail } = require('./src/mailer');
@@ -14,18 +15,37 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Lets the frontend build its form without hardcoding companies/packages twice.
 // Each company sends its own package list, since every company has its own
 // services and its own prices.
-app.get('/api/config', (req, res) => {
+app.get('/api/config', async (req, res) => {
+  // Packages come from your Lexware products. Every company gets the same list
+  // unless it declares its own `packages` in src/config.js.
+  const all = await articles.getPackages();
+  const byKey = new Map(all.map((p) => [p.key, p]));
+
+  function packagesFor(company) {
+    if (!Array.isArray(company.packages) || !company.packages.length) return all;
+    return company.packages.map((t) => byKey.get(articles.slug(t))).filter(Boolean);
+  }
+
   res.json({
     companies: Object.fromEntries(
       Object.entries(config.companies).map(([key, c]) => [
         key,
         {
           label: c.label,
-          packages: c.packages.map((p) => ({ key: p.key, label: p.label, netPrice: p.netPrice })),
+          packages: packagesFor(c).map((p) => ({
+            key: p.key,
+            label: p.title,
+            description: p.description,
+            netPrice: p.netPrice,
+            taxRate: p.taxRate,
+          })),
         },
       ])
     ),
     taxRatePercentage: config.taxRatePercentage,
+    // Lets the UI warn staff when prices are the built-in fallback rather than
+    // the live ones from Lexware.
+    priceSource: articles.status(),
   });
 });
 
@@ -115,9 +135,14 @@ app.post('/api/invoice', async (req, res) => {
   if (!isPlausiblePlate(licensePlate)) {
     return res.status(400).json({ error: 'Please enter the license plate.' });
   }
-  const pkg = config.companies[company].packages.find((p) => p.key === packageKey);
+  const pkg = await articles.findPackage(packageKey);
   if (!pkg) {
-    return res.status(400).json({ error: 'Please choose a valid service package for this company.' });
+    return res.status(400).json({ error: 'Please choose a valid service package.' });
+  }
+  // A company with its own menu must not be billed for something off it.
+  const menu = config.companies[company].packages;
+  if (Array.isArray(menu) && menu.length && !menu.some((t) => articles.slug(t) === pkg.key)) {
+    return res.status(400).json({ error: 'That package is not available for this company.' });
   }
 
   const cleanName = customerName.trim();
@@ -154,12 +179,20 @@ app.post('/api/invoice', async (req, res) => {
   try {
     const contactId = await lexware.getOrCreateCompanyContact(company);
 
-    const introduction = `${pkg.label} — ${cleanName} — Plate: ${displayPlate(licensePlate)}`;
+    const introduction = `${pkg.title} — ${cleanName} — Plate: ${displayPlate(licensePlate)}`;
 
     const created = await lexware.createInvoice({
       contactId,
       introduction,
-      lineItem: { name: pkg.label, netPrice: pkg.netPrice },
+      lineItem: {
+        name: pkg.title,
+        description: pkg.description,
+        netPrice: pkg.netPrice,
+        taxRate: pkg.taxRate,
+        unitName: pkg.unitName,
+        articleId: config.linkArticlesOnInvoice ? pkg.articleId : null,
+        articleType: pkg.articleType,
+      },
     });
 
     const invoice = await lexware.getInvoice(created.id);

@@ -1,11 +1,12 @@
 {
   "name": "garage-invoice-app",
   "version": "1.0.0",
-  "description": "One-screen web app for creating and emailing Lexware/Lexoffice invoices for Ferrari and Lamborghini garage jobs.",
+  "description": "Mobile-first web app for creating and emailing Lexware/lexoffice invoices for garage jobs, with license-plate customer lookup.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "articles": "node scripts/list-articles.js"
   },
   "engines": {
     "node": ">=18"

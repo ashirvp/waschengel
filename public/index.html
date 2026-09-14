@@ -179,16 +179,30 @@
      can only ever see and pick prices that belong to the chosen company. */
   .package-list { display: grid; gap: 10px; }
   .package-btn {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    width: 100%; min-height: 62px; padding: 12px 16px;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+    width: 100%; min-height: 62px; padding: 14px 16px;
     border-radius: 12px; border: 2px solid var(--line);
     background: var(--card-2); color: var(--text);
     font-family: inherit; font-size: 16px; font-weight: 600;
     text-align: left; cursor: pointer;
   }
   .package-btn[aria-pressed="true"] { border-color: var(--accent); background: #23262d; }
-  .package-btn .price { font-size: 17px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .package-btn .gross { display: block; font-size: 11px; font-weight: 500; color: var(--muted-2); text-align: right; }
+  .package-btn .name { min-width: 0; }
+  /* The full Lexware description is a paragraph long. Show enough to tell two
+     similar packages apart, not the whole thing — it all lands on the invoice. */
+  .package-btn .desc {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; margin-top: 3px;
+    font-size: 12px; font-weight: 400; line-height: 1.35; color: var(--muted-2);
+  }
+  .package-btn .price { font-size: 17px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
+  .package-btn .gross { display: block; font-size: 11px; font-weight: 500; color: var(--muted-2); }
+
+  .pricewarn {
+    display: none; margin: 0 0 12px; padding: 10px 12px;
+    border-radius: 10px; font-size: 13px;
+    background: rgba(224,160,44,.10); border: 1px solid rgba(224,160,44,.35); color: var(--warn);
+  }
   .package-empty { color: var(--muted); font-size: 14px; padding: 8px 2px; }
 
   /* Sticky action bar — always reachable with a thumb. */
@@ -297,6 +311,7 @@
   <!-- STEP 3 — packages come from the selected company only. -->
   <section class="card">
     <p class="step-label"><span class="step-num">3</span> Service package</p>
+    <p class="pricewarn" id="priceWarn"></p>
     <div class="package-list" id="packageList">
       <p class="package-empty">Pick a company first.</p>
     </div>
@@ -422,15 +437,27 @@
       return;
     }
 
-    var taxRate = CONFIG.taxRatePercentage || 0;
     company.packages.forEach(function (p) {
+      // Each package carries its own VAT rate from Lexware; only fall back to
+      // the global rate if the article somehow has none.
+      var taxRate = typeof p.taxRate === 'number' ? p.taxRate : (CONFIG.taxRatePercentage || 0);
+
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'package-btn';
       btn.setAttribute('aria-pressed', String(state.packageKey === p.key));
 
       var name = document.createElement('span');
-      name.textContent = p.label;
+      name.className = 'name';
+      var title = document.createElement('span');
+      title.textContent = p.label;
+      name.appendChild(title);
+      if (p.description) {
+        var desc = document.createElement('span');
+        desc.className = 'desc';
+        desc.textContent = p.description;
+        name.appendChild(desc);
+      }
 
       var price = document.createElement('span');
       price.className = 'price';
@@ -455,7 +482,7 @@
 
   function refreshAction() {
     var pkg = selectedPackage();
-    var taxRate = CONFIG.taxRatePercentage || 0;
+    var taxRate = pkg && typeof pkg.taxRate === 'number' ? pkg.taxRate : (CONFIG.taxRatePercentage || 0);
     $('totalVal').textContent = pkg ? money(pkg.netPrice * (1 + taxRate / 100)) : '—';
 
     var ready = !!(state.company && state.packageKey &&
@@ -740,6 +767,14 @@
     .then(function (r) { return r.json(); })
     .then(function (cfg) {
       CONFIG = cfg;
+      // Staff need to know when they're looking at stand-in prices, because an
+      // invoice sent at a stale price is a real problem to unwind.
+      var src = cfg.priceSource || {};
+      if (src.usedFallback) {
+        var w = $('priceWarn');
+        w.textContent = 'Prices could not be loaded from Lexware — showing the built-in list. Check with the office before invoicing.';
+        w.style.display = 'block';
+      }
       renderCompanies();
       renderPackages();
       refreshAction();

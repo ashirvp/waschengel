@@ -166,25 +166,54 @@ async function getOrCreateCompanyContact(companyKey) {
   return data.id;
 }
 
+// Lists the products/services ("Artikel") from Lexware. These are the service
+// packages staff pick from, so prices live in Lexware and not in this repo.
+async function listArticles({ maxPages = 10, size = 100 } = {}) {
+  const all = [];
+  for (let page = 0; page < maxPages; page++) {
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    const res = await lexFetch(`/articles?${params.toString()}`, {
+      method: 'GET',
+      headers: headers(),
+    });
+    const data = await res.json();
+    const content = Array.isArray(data.content) ? data.content : [];
+    all.push(...content);
+    // `last` is the API's own end-of-pages flag; the length check is a belt-and
+    // -braces guard so a missing flag can't spin us through all maxPages.
+    if (data.last === true || content.length < size) break;
+  }
+  return all;
+}
+
 // Creates a finalized invoice referencing the given contact, with a single
 // line item for the chosen service package. Returns { id, voucherNumber }.
 async function createInvoice({ contactId, introduction, lineItem }) {
+  // Default to a free-text ("custom") line, which always works. Linking the
+  // Lexware article id is opt-in via LEXWARE_LINK_ARTICLES because the exact
+  // payload can't be verified without sending a real invoice.
+  const line = {
+    type: 'custom',
+    name: lineItem.name,
+    quantity: 1,
+    unitName: lineItem.unitName || 'Stück',
+    unitPrice: {
+      currency: 'EUR',
+      netAmount: lineItem.netPrice,
+      taxRatePercentage:
+        typeof lineItem.taxRate === 'number' ? lineItem.taxRate : config.taxRatePercentage,
+    },
+  };
+  if (lineItem.description) line.description = lineItem.description;
+  if (lineItem.articleId) {
+    line.id = lineItem.articleId;
+    line.type = lineItem.articleType === 'PRODUCT' ? 'material' : 'service';
+  }
+
   const body = {
     voucherDate: new Date().toISOString(),
     address: { contactId },
-    lineItems: [
-      {
-        type: 'custom',
-        name: lineItem.name,
-        quantity: 1,
-        unitName: 'Stück',
-        unitPrice: {
-          currency: 'EUR',
-          netAmount: lineItem.netPrice,
-          taxRatePercentage: config.taxRatePercentage,
-        },
-      },
-    ],
+    lineItems: [line],
     totalPrice: { currency: 'EUR' },
     taxConditions: { taxType: 'net' },
     introduction,
@@ -220,6 +249,7 @@ async function downloadInvoiceFile(invoiceId) {
 
 module.exports = {
   getOrCreateCompanyContact,
+  listArticles,
   searchContacts,
   contactDisplayName,
   createInvoice,

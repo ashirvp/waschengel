@@ -8,9 +8,13 @@ the invoice in Lexware (formerly lexoffice) and emails the PDF — no Lexware
 login for staff, ever.
 
 Three companies are set up out of the box: **Lamborghini / McLaren**,
-**Ferrari**, and **Bentley**. Each has its **own service packages and its own
-prices**, and picking a company recolors the whole screen, so a wrong brand
-color is a visible warning that you're about to invoice the wrong company.
+**Ferrari**, and **Bentley**. Picking one recolors the whole screen, so a wrong
+brand color is a visible warning that you're about to invoice the wrong company.
+
+**Prices are not stored in this repo.** The service packages staff pick are the
+products (*Artikel*) in your Lexware account, fetched over the API. Change a
+price in Lexware and the app follows within ten minutes — no edit here, no
+redeploy.
 
 ## 1. Get a Lexware API key
 
@@ -35,8 +39,14 @@ Open `.env` and fill in:
   [app password](https://support.google.com/accounts/answer/185833), not your
   normal password)
 
-To change companies, service packages, or prices later, edit `src/config.js` —
-that file is the single source of truth, and the form rebuilds itself from it.
+**To change a price**, change it in Lexware. Nothing here needs touching.
+
+**To change which packages staff can pick**, edit `packageAllowlist` in
+`src/config.js` — a list of product titles, in the order they appear on screen.
+An empty list means "offer every product in my Lexware account". To give one
+company a different menu, add a `packages: [...]` list to that company.
+
+**To change companies**, edit the `companies` block in `src/config.js`.
 If you add a company there, give it a brand color by adding a
 `[data-brand="yourkey"]` block in `public/index.html`; unlisted keys fall back
 to red.
@@ -60,9 +70,10 @@ in your Lexware voucher list and that the email arrives.
 This is the part worth understanding before you change anything, because it
 drives the whole design.
 
-**What Lexware stores:** contacts, invoices, credit notes, and the other
-billing documents. A contact has a name, addresses, email addresses, phone
-numbers and a free-text note.
+**What Lexware stores:** contacts, **products/services (*Artikel*)**, invoices,
+credit notes, and the other billing documents. A contact has a name, addresses,
+email addresses, phone numbers and a free-text note. A product has a title,
+description, unit, tax rate and a price.
 
 **What Lexware does not have:** any concept of a *vehicle*. There is no car
 entity, no license-plate field, and **no custom/user-defined fields on
@@ -77,6 +88,7 @@ itself (`vehicles.json`), and why that file is the one thing you must not lose.
 
 | Call | When | Why |
 | --- | --- | --- |
+| `GET /articles` | every 10 minutes | the service packages and their prices |
 | `GET /contacts?name=…` | before creating a company contact | so a redeploy can't create a second "Ferrari Dealer" |
 | `POST /contacts` | only if the search found nothing | first-ever invoice for that company |
 | `POST /invoices?finalize=true` | every invoice | creates and finalizes it |
@@ -91,15 +103,28 @@ about **2 requests per second** per key and one invoice costs several calls.
 Honestly: **almost nothing.** That's the point of this setup.
 
 1. **Create the API key** (section 1 above). That's the only mandatory step.
+1. **Keep your service packages as products in Lexware.** They already are —
+   that's where the app reads them from. When you add, rename or reprice one,
+   add its title to `packageAllowlist` in `src/config.js` if staff should be
+   able to pick it. Run `npm run articles` to print what your account has and
+   which allowlist entries matched:
+
+   ```
+   npm run articles
+   ```
+
+   Titles are matched ignoring case, spaces and punctuation, but the wording
+   must otherwise be identical — this script is how you catch a mismatch before
+   your staff do.
 2. **Don't pre-create the three dealer contacts by hand.** The app creates each
    one the first time you invoice it, and from then on looks it up by name. If
    you create them manually, make the name match `contactName` in
    `src/config.js` *exactly* — otherwise the app won't recognise yours and will
    make its own alongside it.
 3. **Check your invoice numbering and VAT settings** in Lexware once, because
-   the app takes whatever Lexware is configured to do. Prices in
-   `src/config.js` are **net**; `taxRatePercentage` (default 19) is added on
-   top.
+   the app takes whatever Lexware is configured to do. Each product's own VAT
+   rate is used; the `taxRatePercentage` in `src/config.js` is only a fallback
+   for a product that somehow has none.
 4. **Don't add the car owners as Lexware contacts.** The invoice is addressed
    to the dealer who pays; the owner's name and plate are printed on the
    invoice as text. Adding one contact per car would bloat your contact list
@@ -108,6 +133,24 @@ Honestly: **almost nothing.** That's the point of this setup.
 If you ever *do* want the car owners in Lexware as real contacts, the app
 already has the hook: `GET /api/contacts?q=…` searches Lexware contacts by
 name and the vehicle record has a `lexwareContactId` field ready for it.
+
+### If Lexware can't be reached
+
+The app keeps a built-in copy of the five packages and their prices. If the
+API is down or the key is missing, staff see those instead of an empty screen,
+with an amber warning saying the prices are not live. Invoicing still works.
+Once a fetch succeeds, the live list takes over.
+
+### Linking invoice lines to the product (optional)
+
+By default each invoice line is written as free text carrying the product's
+title, description and price. That always works.
+
+Setting `LEXWARE_LINK_ARTICLES=true` instead puts the Lexware **article id** on
+the line, which gives you revenue-per-product reporting in Lexware. It's off by
+default because the exact payload can't be verified without sending a real
+invoice from your account. Turn it on, send **one test invoice**, check it looks
+right in Lexware, and keep it on only if it does.
 
 ## 5. Duplicate prevention
 
@@ -225,7 +268,9 @@ billing relationship is.
 
 | File | What's in it |
 | --- | --- |
-| `src/config.js` | **companies, packages, prices** — the file you'll actually edit |
+| `src/config.js` | companies, and which Lexware products staff may pick |
+| `src/articles.js` | fetches the packages/prices from Lexware, caches, falls back |
+| `scripts/list-articles.js` | `npm run articles` — check your titles match |
 | `src/plates.js` | plate normalization; the basis of duplicate detection |
 | `src/store.js` | the vehicle registry (plate → customer, company, history) |
 | `src/lexware.js` | Lexware API calls, contact dedupe, rate limiting |
@@ -240,7 +285,13 @@ billing relationship is.
 - **Invoice created but no email** — check the SMTP credentials; the invoice is
   still safely saved in Lexware either way (the app says so in an amber
   "Invoice created" message).
-- **Wrong price for a package** — edit `netPrice` in `src/config.js`, redeploy.
+- **Wrong price for a package** — change it in Lexware; the app picks it up
+  within ten minutes (restart to apply immediately).
+- **A package is missing from the app** — its title in `packageAllowlist`
+  doesn't match the product in Lexware. Run `npm run articles` to see which.
+- **Amber "prices could not be loaded from Lexware"** — the app is showing its
+  built-in fallback prices. Check `LEXWARE_API_KEY` and that the account's plan
+  includes API access.
 - **Known cars have been forgotten after a deploy** — `DATA_DIR` isn't on a
   persistent volume. See "You need a persistent disk" above.
 - **Duplicate contacts in Lexware** — if two already exist from before, delete
