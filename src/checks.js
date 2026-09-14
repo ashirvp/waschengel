@@ -8,13 +8,10 @@
 // Nothing here ever returns a secret. Keys and passwords are reported as
 // "set (n chars)" so a report is safe to share.
 
-const fs = require('fs');
-const path = require('path');
 const config = require('./config');
 const lexware = require('./lexware');
 const contacts = require('./contacts');
 const articles = require('./articles');
-const store = require('./store');
 
 function present(v) {
   return v ? `set (${String(v).length} chars)` : 'MISSING';
@@ -39,62 +36,16 @@ async function runChecks() {
   check(cfg, !!config.smtp.pass, `SMTP_PASS: ${present(config.smtp.pass)}`);
   check(cfg, !!config.smtp.from, `SMTP_FROM: ${config.smtp.from || 'MISSING'}`);
 
-  // ------------------------------------------------------------ 2. storage
-  const st = section('Storage (the vehicle registry)');
-  const where = store.describe();
-  st.notes.push(`Driver: ${where.detail}`);
-
-  if (where.persistent) {
-    check(st, true, `Registry will survive restarts (${where.driver})`);
-  } else {
-    check(st, false, 'The vehicle registry CANNOT persist on this host',
-      'This is a serverless host (Vercel/Lambda/Netlify/Cloud Run): the filesystem is\n' +
-      'wiped between requests. Invoices would still work, but every car would be\n' +
-      'forgotten immediately and the plate lookup would never find anything.\n' +
-      'Fix: set KV_REST_API_URL and KV_REST_API_TOKEN (or the UPSTASH_ equivalents),\n' +
-      'or move to a host with a real disk.');
-  }
-
-  try {
-    const msg = await store.healthcheck();
-    check(st, true, msg);
-  } catch (e) {
-    check(st, false, 'The registry is not reachable', e.message);
-  }
-
-  // A file driver on a normal host still needs a directory that outlives a deploy.
-  if (where.driver === 'file') {
-    let writable = false;
-    try {
-      fs.mkdirSync(config.dataDir, { recursive: true });
-      const probe = path.join(config.dataDir, '.doctor-probe');
-      fs.writeFileSync(probe, 'ok');
-      fs.unlinkSync(probe);
-      writable = true;
-      check(st, true, `DATA_DIR is writable (${config.dataDir})`);
-    } catch (e) {
-      check(st, false, `DATA_DIR is not writable (${config.dataDir})`, e.message);
-    }
-    if (writable && where.persistent &&
-        /^\/tmp(\/|$)|^\/var\/tmp(\/|$)/.test(path.resolve(config.dataDir))) {
-      check(st, false, 'DATA_DIR is under /tmp',
-        'Most hosts clear /tmp on restart. Point DATA_DIR at a mounted volume.');
-    }
-  }
-
-  try {
-    const s2 = await store.stats();
-    st.notes.push(`Vehicles on file: ${s2.vehicles} (${s2.visits} visits recorded)`);
-  } catch {
-    st.notes.push('Vehicles on file: could not be read');
-  }
+  // The app stores nothing: no database, no files, no DATA_DIR. The vehicle
+  // number lives only on the invoice in Lexware, so there is no storage to
+  // check and nothing to lose on a redeploy.
 
   if (!config.lexware.apiKey) {
     stopped = 'Without LEXWARE_API_KEY nothing else can be checked. Add it and run this again.';
     return finish(sections, stopped);
   }
 
-  // ------------------------------------------------------------ 3. lexware
+  // ------------------------------------------------------------ 2. lexware
   const lx = section('Lexware connection');
   try {
     const profile = await lexware.getProfile();
@@ -107,7 +58,7 @@ async function runChecks() {
     return finish(sections, stopped);
   }
 
-  // ---------------------------------------------------------- 4. customers
+  // ---------------------------------------------------------- 3. customers
   const cu = section('Customers (who each brand bills)');
   for (const [key, company] of Object.entries(config.companies)) {
     try {
@@ -140,7 +91,7 @@ async function runChecks() {
     }
   }
 
-  // ----------------------------------------------------------- 5. products
+  // ----------------------------------------------------------- 4. products
   const pr = section('Products (the service packages)');
   let live = [];
   try {
@@ -175,7 +126,7 @@ async function runChecks() {
       missing ? 'Fix the title in src/config.js or in Lexware so they match.' : null);
   }
 
-  // --------------------------------------------------------------- 6. smtp
+  // --------------------------------------------------------------- 5. smtp
   const sm = section('Email sending');
   if (!config.smtp.host || !config.smtp.user || !config.smtp.pass) {
     check(sm, false, 'SMTP is not configured', 'Invoices would be created but never emailed.');

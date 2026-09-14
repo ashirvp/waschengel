@@ -9,285 +9,113 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <title>Garage Invoice</title>
 <style>
-  /* Mobile-first, one thumb, gloves-on. Everything tappable is >= 52px tall and
-     every input is >= 16px so iOS doesn't zoom the page when it gets focus.
+  /* Three taps and a plate, one thumb, gloves on. Everything tappable is at
+     least 56px and every input is >=16px so iOS doesn't zoom on focus.
      System fonts only: the garage tablet shouldn't wait on a font CDN. */
   :root {
-    --bg: #121316;
-    --card: #1b1d22;
-    --card-2: #202329;
-    --line: #2c2f36;
-    --text: #eef0f3;
-    --muted: #9198a3;
-    --muted-2: #6b7180;
-    --ok: #35c46a;
-    --warn: #e0a02c;
-    --err: #ef4b52;
+    --bg:#121316; --card:#1b1d22; --card-2:#202329; --line:#2c2f36;
+    --text:#eef0f3; --muted:#9198a3; --muted-2:#6b7180;
+    --ok:#35c46a; --warn:#e0a02c; --err:#ef4b52;
+    --accent:#8b90a0; --accent-contrast:#ffffff;
+  }
+  /* Brand identity — the company you pick recolors the console. Not decoration:
+     a wrong brand color is a visible flag that you're about to invoice the
+     wrong company. To add a company, add a [data-brand="yourkey"] block using
+     the same key as in src/config.js. */
+  [data-brand="lambo_mclaren"] { --accent:#e8d200; --accent-contrast:#14151a; }
+  [data-brand="ferrari"]       { --accent:#d2001c; --accent-contrast:#ffffff; }
+  [data-brand="bentley"]       { --accent:#1f7a4d; --accent-contrast:#ffffff; }
 
-    /* Brand identity — the company you pick recolors the whole console.
-       This isn't decoration: a wrong brand color on screen is a visible
-       flag that you're about to invoice the wrong company.
-       To add a company, add a [data-brand="yourkey"] block below using the
-       same key you used in src/config.js. Unlisted keys fall back to this. */
-    --accent: #8b90a0;
-    --accent-contrast: #ffffff;
-  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; background:var(--bg); color:var(--text); font-size:16px; line-height:1.4;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif; }
+  body { min-height:100dvh; display:flex; flex-direction:column;
+    padding-bottom:calc(100px + env(safe-area-inset-bottom)); }
 
-  [data-brand="lambo_mclaren"] { --accent: #e8d200; --accent-contrast: #14151a; }
-  [data-brand="ferrari"]       { --accent: #d2001c; --accent-contrast: #ffffff; }
-  [data-brand="bentley"]       { --accent: #1f7a4d; --accent-contrast: #ffffff; }
+  header { position:sticky; top:0; z-index:5; display:flex; align-items:center; justify-content:space-between;
+    gap:12px; padding:calc(12px + env(safe-area-inset-top)) 16px 12px;
+    background:rgba(18,19,22,.92); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); }
+  header h1 { margin:0; font-size:17px; font-weight:700; letter-spacing:.3px; }
+  .brand-dot { width:12px; height:12px; border-radius:50%; background:var(--accent); flex:none; transition:background .2s; }
+  .brand-name { font-size:13px; color:var(--muted); }
 
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  main { flex:1; padding:16px; display:grid; gap:14px; max-width:640px; width:100%; margin:0 auto; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; }
+  .step-label { display:flex; align-items:center; gap:8px; margin:0 0 12px;
+    font-size:12px; font-weight:700; letter-spacing:.10em; text-transform:uppercase; color:var(--muted-2); }
+  .step-num { width:20px; height:20px; border-radius:50%; background:var(--card-2); color:var(--muted);
+    display:grid; place-items:center; font-size:11px; flex:none; }
 
-  html, body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
-    font-size: 16px;
-    line-height: 1.4;
-  }
+  /* Step 1 — the vehicle number, the only thing anyone types. */
+  #plate { width:100%; min-height:72px; padding:12px 14px; font-size:30px; font-weight:700;
+    letter-spacing:.12em; text-align:center; text-transform:uppercase; font-variant-numeric:tabular-nums;
+    color:var(--text); background:var(--card-2); border:1px solid var(--line); border-radius:12px; outline:none; }
+  #plate:focus { border-color:var(--accent); }
+  #plate::placeholder { color:var(--muted-2); }
 
-  body {
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    /* Room for the sticky action bar so the last field is never hidden. */
-    padding-bottom: calc(96px + env(safe-area-inset-bottom));
-  }
+  /* Step 2 — one big target per company. */
+  .company-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+  .company-btn { position:relative; min-height:64px; padding:12px 14px 12px 38px; border-radius:12px;
+    border:2px solid var(--line); background:var(--card-2); color:var(--text);
+    font-family:inherit; font-size:16px; font-weight:600; text-align:left; cursor:pointer; }
+  .company-btn::before { content:''; position:absolute; left:14px; top:50%; transform:translateY(-50%);
+    width:14px; height:14px; border-radius:50%; background:var(--dot,#8b90a0); }
+  .company-btn[aria-pressed="true"] { border-color:var(--dot,var(--accent)); background:#23262d; }
 
-  header {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
-    background: rgba(18, 19, 22, 0.92);
-    backdrop-filter: blur(8px);
-    border-bottom: 1px solid var(--line);
-  }
-  header h1 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: .3px; }
-  header .brand-dot {
-    width: 12px; height: 12px; border-radius: 50%;
-    background: var(--accent); flex: none;
-    transition: background .2s;
-  }
-  header .brand-name { font-size: 13px; color: var(--muted); }
+  .recipient { display:none; margin-top:12px; padding:10px 12px; border-radius:10px;
+    background:var(--card-2); border:1px solid var(--line); font-size:13px; }
+  .recipient .tag { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted-2); margin-bottom:2px; }
+  .recipient .who { font-weight:600; }
+  .recipient .mail { color:var(--muted); font-size:12px; margin-top:1px; word-break:break-all; }
+  .recipient.bad { background:rgba(239,75,82,.10); border-color:rgba(239,75,82,.35); }
+  .recipient.bad .who { color:var(--err); }
 
-  main { flex: 1; padding: 16px; display: grid; gap: 16px; max-width: 640px; width: 100%; margin: 0 auto; }
+  /* Step 3 — this company's packages only. */
+  .package-list { display:grid; gap:10px; }
+  .package-btn { display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+    width:100%; min-height:66px; padding:14px 16px; border-radius:12px; border:2px solid var(--line);
+    background:var(--card-2); color:var(--text); font-family:inherit; font-size:16px; font-weight:600;
+    text-align:left; cursor:pointer; }
+  .package-btn[aria-pressed="true"] { border-color:var(--accent); background:#23262d; }
+  .package-btn .name { min-width:0; }
+  /* The Lexware description is a paragraph. Show enough to tell two similar
+     packages apart; the full text still lands on the invoice. */
+  .package-btn .desc { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+    overflow:hidden; margin-top:3px; font-size:12px; font-weight:400; line-height:1.35; color:var(--muted-2); }
+  .package-btn .price { font-size:17px; font-weight:700; white-space:nowrap;
+    font-variant-numeric:tabular-nums; text-align:right; }
+  .package-btn .gross { display:block; font-size:11px; font-weight:500; color:var(--muted-2); }
+  .package-empty { color:var(--muted); font-size:14px; padding:8px 2px; }
 
-  .card {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    padding: 16px;
-  }
+  .pricewarn { display:none; margin:0 0 12px; padding:10px 12px; border-radius:10px; font-size:13px;
+    background:rgba(224,160,44,.10); border:1px solid rgba(224,160,44,.35); color:var(--warn); }
 
-  .step-label {
-    display: flex; align-items: center; gap: 8px;
-    font-size: 12px; font-weight: 700; letter-spacing: .10em;
-    text-transform: uppercase; color: var(--muted-2);
-    margin: 0 0 12px;
-  }
-  .step-num {
-    width: 20px; height: 20px; border-radius: 50%;
-    background: var(--card-2); color: var(--muted);
-    display: grid; place-items: center;
-    font-size: 11px; flex: none;
-  }
+  .actionbar { position:fixed; left:0; right:0; bottom:0; z-index:10;
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+    background:rgba(18,19,22,.95); backdrop-filter:blur(8px); border-top:1px solid var(--line); }
+  .actionbar-inner { max-width:640px; margin:0 auto; display:flex; align-items:center; gap:12px; }
+  .total { flex:none; min-width:96px; }
+  .total .lbl { font-size:11px; color:var(--muted-2); text-transform:uppercase; letter-spacing:.08em; }
+  .total .val { font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .btn-primary { flex:1; min-height:64px; border:none; border-radius:14px; background:var(--accent);
+    color:var(--accent-contrast); font-family:inherit; font-size:18px; font-weight:700; cursor:pointer; }
+  .btn-primary:disabled { background:#2a2d34; color:var(--muted-2); cursor:not-allowed; }
 
-  label.field { display: block; font-size: 13px; color: var(--muted); margin: 0 0 6px; }
-
-  input[type="text"], input[type="email"] {
-    width: 100%;
-    min-height: 56px;
-    padding: 12px 14px;
-    font-size: 17px;
-    font-family: inherit;
-    color: var(--text);
-    background: var(--card-2);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    outline: none;
-  }
-  input:focus { border-color: var(--accent); }
-  input::placeholder { color: var(--muted-2); }
-
-  /* The plate is the way into everything else, so it gets the big treatment. */
-  #plate {
-    min-height: 68px;
-    font-size: 28px;
-    font-weight: 700;
-    letter-spacing: .12em;
-    text-align: center;
-    text-transform: uppercase;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .hint { font-size: 13px; color: var(--muted); margin: 8px 2px 0; min-height: 18px; }
-  .hint.ok   { color: var(--ok); }
-  .hint.warn { color: var(--warn); }
-  .hint.err  { color: var(--err); }
-
-  .known-banner {
-    display: none;
-    margin-top: 12px;
-    padding: 12px 14px;
-    border-radius: 12px;
-    background: rgba(53, 196, 106, .10);
-    border: 1px solid rgba(53, 196, 106, .35);
-    font-size: 14px;
-  }
-  .known-banner strong { color: var(--ok); }
-  .known-banner .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
-
-  .suggestions { display: grid; gap: 8px; margin-top: 12px; }
-  .suggestion {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    width: 100%; min-height: 52px; padding: 10px 14px;
-    background: var(--card-2); border: 1px solid var(--line);
-    border-radius: 12px; color: var(--text);
-    font-family: inherit; font-size: 15px; text-align: left; cursor: pointer;
-  }
-  .suggestion .plate { font-weight: 700; letter-spacing: .06em; }
-  .suggestion .who { color: var(--muted); font-size: 13px; }
-
-  /* Company picker: one big target per company, wrapping on narrow screens. */
-  .company-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-  .company-btn {
-    position: relative;
-    min-height: 60px;
-    padding: 12px 14px 12px 38px;
-    border-radius: 12px;
-    border: 2px solid var(--line);
-    background: var(--card-2);
-    color: var(--text);
-    font-family: inherit; font-size: 15px; font-weight: 600;
-    text-align: left; cursor: pointer;
-  }
-  .company-btn::before {
-    content: ''; position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
-    width: 14px; height: 14px; border-radius: 50%;
-    background: var(--dot, #8b90a0);
-  }
-  .company-btn[aria-pressed="true"] { border-color: var(--dot, var(--accent)); background: #23262d; }
-
-  /* Packages: rebuilt from scratch every time the company changes, so a worker
-     can only ever see and pick prices that belong to the chosen company. */
-  .package-list { display: grid; gap: 10px; }
-  .package-btn {
-    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
-    width: 100%; min-height: 62px; padding: 14px 16px;
-    border-radius: 12px; border: 2px solid var(--line);
-    background: var(--card-2); color: var(--text);
-    font-family: inherit; font-size: 16px; font-weight: 600;
-    text-align: left; cursor: pointer;
-  }
-  .package-btn[aria-pressed="true"] { border-color: var(--accent); background: #23262d; }
-  .package-btn .name { min-width: 0; }
-  /* The full Lexware description is a paragraph long. Show enough to tell two
-     similar packages apart, not the whole thing — it all lands on the invoice. */
-  .package-btn .desc {
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-    overflow: hidden; margin-top: 3px;
-    font-size: 12px; font-weight: 400; line-height: 1.35; color: var(--muted-2);
-  }
-  .package-btn .price { font-size: 17px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
-  .package-btn .gross { display: block; font-size: 11px; font-weight: 500; color: var(--muted-2); }
-
-  /* Who the invoice is actually addressed to. Staff pick a car brand, but the
-     bill goes to a differently-named dealer company — showing it removes the
-     guesswork and catches a wrong pick before the invoice goes out. */
-  .recipient {
-    display: none; margin-top: 12px; padding: 10px 12px;
-    border-radius: 10px; background: var(--card-2); border: 1px solid var(--line);
-    font-size: 13px;
-  }
-  .recipient .tag {
-    font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
-    color: var(--muted-2); margin-bottom: 2px;
-  }
-  .recipient .who { font-weight: 600; }
-  .recipient .mail { color: var(--muted); font-size: 12px; margin-top: 1px; word-break: break-all; }
-  .recipient.bad { background: rgba(239,75,82,.10); border-color: rgba(239,75,82,.35); }
-  .recipient.bad .who { color: var(--err); font-weight: 600; }
-
-  .pricewarn {
-    display: none; margin: 0 0 12px; padding: 10px 12px;
-    border-radius: 10px; font-size: 13px;
-    background: rgba(224,160,44,.10); border: 1px solid rgba(224,160,44,.35); color: var(--warn);
-  }
-  .package-empty { color: var(--muted); font-size: 14px; padding: 8px 2px; }
-
-  /* Sticky action bar — always reachable with a thumb. */
-  .actionbar {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
-    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-    background: rgba(18, 19, 22, .95);
-    backdrop-filter: blur(8px);
-    border-top: 1px solid var(--line);
-  }
-  .actionbar-inner { max-width: 640px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
-  .total { flex: none; min-width: 92px; }
-  .total .lbl { font-size: 11px; color: var(--muted-2); text-transform: uppercase; letter-spacing: .08em; }
-  .total .val { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
-
-  .btn-primary {
-    flex: 1; min-height: 60px; border: none; border-radius: 14px;
-    background: var(--accent); color: var(--accent-contrast);
-    font-family: inherit; font-size: 17px; font-weight: 700; cursor: pointer;
-  }
-  .btn-primary:disabled { background: #2a2d34; color: var(--muted-2); cursor: not-allowed; }
-
-  .btn-ghost {
-    min-height: 52px; padding: 0 18px;
-    border-radius: 12px; border: 1px solid var(--line);
-    background: transparent; color: var(--text);
-    font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
-  }
-
-  /* Overlays: conflict question and the success screen. */
-  .overlay {
-    position: fixed; inset: 0; z-index: 20;
-    display: none; align-items: center; justify-content: center;
-    padding: 20px; background: rgba(8, 9, 11, .82);
-  }
-  .overlay[data-open="true"] { display: flex; }
-  .sheet {
-    width: 100%; max-width: 440px;
-    background: var(--card); border: 1px solid var(--line);
-    border-radius: 18px; padding: 22px;
-  }
-  .sheet h2 { margin: 0 0 6px; font-size: 19px; }
-  .sheet p { margin: 0 0 14px; color: var(--muted); font-size: 15px; }
-  .compare { display: grid; gap: 10px; margin-bottom: 18px; }
-  .compare div {
-    padding: 12px 14px; border-radius: 12px;
-    background: var(--card-2); border: 1px solid var(--line); font-size: 14px;
-  }
-  .compare .tag { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-2); margin-bottom: 3px; }
-  .sheet-actions { display: grid; gap: 10px; }
-
-  .success-icon {
-    width: 62px; height: 62px; border-radius: 50%; margin: 0 auto 14px;
-    display: grid; place-items: center; font-size: 32px;
-    background: rgba(53, 196, 106, .14); border: 2px solid var(--ok); color: var(--ok);
-  }
-  .success-icon.warn { background: rgba(224, 160, 44, .14); border-color: var(--warn); color: var(--warn); }
-  .sheet.center { text-align: center; }
-  .voucher { font-size: 26px; font-weight: 700; letter-spacing: .04em; margin: 6px 0 4px; }
-
-  .sr-only {
-    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
-  }
-
-  @media (min-width: 700px) {
-    main { padding: 24px 16px; gap: 18px; }
-  }
+  .overlay { position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center;
+    padding:20px; background:rgba(8,9,11,.85); }
+  .overlay[data-open="true"] { display:flex; }
+  .sheet { width:100%; max-width:440px; background:var(--card); border:1px solid var(--line);
+    border-radius:18px; padding:24px; text-align:center; }
+  .sheet h2 { margin:0 0 6px; font-size:20px; }
+  .sheet p { margin:0 0 18px; color:var(--muted); font-size:15px; }
+  .icon { width:66px; height:66px; border-radius:50%; margin:0 auto 14px; display:grid; place-items:center;
+    font-size:34px; background:rgba(53,196,106,.14); border:2px solid var(--ok); color:var(--ok); }
+  .icon.warn { background:rgba(224,160,44,.14); border-color:var(--warn); color:var(--warn); }
+  .voucher { font-size:26px; font-weight:700; letter-spacing:.04em; margin:6px 0 2px; }
+  .plate-out { font-size:14px; color:var(--muted); margin-bottom:10px; letter-spacing:.06em; }
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  @media (min-width:700px) { main { padding:24px 16px; } }
 </style>
 </head>
 <body>
@@ -301,32 +129,20 @@
 </header>
 
 <main>
-  <!-- STEP 1 — the plate is the entry point: type it and the app fills in the rest. -->
   <section class="card">
-    <p class="step-label"><span class="step-num">1</span> License plate</p>
-    <label class="field sr-only" for="plate">License plate</label>
+    <p class="step-label"><span class="step-num">1</span> Vehicle number</p>
+    <label class="sr-only" for="plate">Vehicle number</label>
     <input id="plate" type="text" inputmode="text" autocomplete="off"
            autocapitalize="characters" autocorrect="off" spellcheck="false"
-           enterkeyhint="search" placeholder="M-AB 1234" />
-    <p class="hint" id="plateHint">Type the plate to look the car up.</p>
-    <div class="known-banner" id="knownBanner"></div>
-    <div class="suggestions" id="suggestions"></div>
+           enterkeyhint="done" placeholder="M-AB 1234" />
   </section>
 
-  <!-- STEP 2 -->
   <section class="card">
-    <p class="step-label"><span class="step-num">2</span> Customer &amp; company</p>
-    <label class="field" for="customer">Customer name</label>
-    <input id="customer" type="text" autocomplete="off" autocapitalize="words"
-           enterkeyhint="next" placeholder="Max Mustermann" />
-    <p class="hint" id="customerHint"></p>
-
-    <label class="field" style="margin-top:14px">Company to invoice</label>
+    <p class="step-label"><span class="step-num">2</span> Company</p>
     <div class="company-grid" id="companyGrid"></div>
     <div class="recipient" id="recipient"></div>
   </section>
 
-  <!-- STEP 3 — packages come from the selected company only. -->
   <section class="card">
     <p class="step-label"><span class="step-num">3</span> Service package</p>
     <p class="pricewarn" id="priceWarn"></p>
@@ -342,34 +158,18 @@
       <div class="lbl">Total</div>
       <div class="val" id="totalVal">—</div>
     </div>
-    <button class="btn-primary" id="submitBtn" disabled>Create Invoice</button>
+    <button class="btn-primary" id="submitBtn" disabled>Create &amp; Send</button>
   </div>
 </div>
 
-<!-- Plate already on file under another name/company. Only a human can say -->
-<!-- whether that's a typo or a real change of owner, so we ask.            -->
-<div class="overlay" id="conflictOverlay">
+<div class="overlay" id="resultOverlay">
   <div class="sheet">
-    <h2>This plate is already on file</h2>
-    <p>Check which one is right before the invoice goes out.</p>
-    <div class="compare" id="conflictCompare"></div>
-    <div class="sheet-actions">
-      <button class="btn-primary" id="conflictUseExisting">Use the saved details</button>
-      <button class="btn-ghost" id="conflictOverwrite">Keep what I typed &amp; update</button>
-      <button class="btn-ghost" id="conflictCancel">Go back</button>
-    </div>
-  </div>
-</div>
-
-<div class="overlay" id="successOverlay">
-  <div class="sheet center">
-    <div class="success-icon" id="successIcon">✓</div>
-    <h2 id="successTitle">Invoice created</h2>
-    <div class="voucher" id="successVoucher"></div>
-    <p id="successDetail"></p>
-    <div class="sheet-actions">
-      <button class="btn-primary" id="successNext">Next car</button>
-    </div>
+    <div class="icon" id="resultIcon">✓</div>
+    <h2 id="resultTitle">Invoice sent</h2>
+    <div class="voucher" id="resultVoucher"></div>
+    <div class="plate-out" id="resultPlate"></div>
+    <p id="resultDetail"></p>
+    <button class="btn-primary" id="resultNext">Next car</button>
   </div>
 </div>
 
@@ -378,17 +178,15 @@
   'use strict';
 
   var CONFIG = { companies: {}, taxRatePercentage: 19 };
-  var state = { company: null, packageKey: null, vehicle: null, busy: false,
-                lastLookupKey: null, autofilledName: null };
-
+  var state = { company: null, packageKey: null, busy: false };
   var $ = function (id) { return document.getElementById(id); };
-  var plateEl = $('plate'), customerEl = $('customer');
+  var plateEl = $('plate');
 
   function money(n) {
     return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n);
   }
-  function normalizePlate(s) {
-    return String(s || '').toUpperCase().replace(/[^A-Z0-9ÄÖÜ]/g, '');
+  function plateOk() {
+    return plateEl.value.replace(/[^A-Za-z0-9ÄÖÜäöü]/g, '').length >= 2;
   }
   function selectedPackage() {
     var c = CONFIG.companies[state.company];
@@ -399,7 +197,7 @@
     return null;
   }
 
-  // ---- Company -----------------------------------------------------------
+  // ---- Step 2: company --------------------------------------------------
 
   function renderCompanies() {
     var grid = $('companyGrid');
@@ -410,7 +208,7 @@
       btn.className = 'company-btn';
       btn.setAttribute('aria-pressed', String(state.company === key));
       btn.textContent = CONFIG.companies[key].label;
-      // Read each brand's color from its own CSS block so the swatch here and
+      // Read each brand's colour from its own CSS block, so the swatch here and
       // the accent everywhere else can never drift apart.
       var probe = document.createElement('div');
       probe.setAttribute('data-brand', key);
@@ -418,7 +216,6 @@
       document.body.appendChild(probe);
       btn.style.setProperty('--dot', getComputedStyle(probe).getPropertyValue('--accent').trim());
       document.body.removeChild(probe);
-
       btn.addEventListener('click', function () { setCompany(key); });
       grid.appendChild(btn);
     });
@@ -427,13 +224,11 @@
   function setCompany(key) {
     state.company = key;
     document.documentElement.setAttribute('data-brand', key || '');
-    $('brandName').textContent = key && CONFIG.companies[key] ? CONFIG.companies[key].label : 'No company';
+    $('brandName').textContent = CONFIG.companies[key] ? CONFIG.companies[key].label : 'No company';
 
-    // Keep the chosen service across a company switch only if that company
-    // actually offers it — otherwise the price on screen would be a lie.
-    var pkgs = (CONFIG.companies[key] || {}).packages || [];
-    var stillValid = pkgs.some(function (p) { return p.key === state.packageKey; });
-    if (!stillValid) state.packageKey = null;
+    // Each company has its own menu, so a package chosen for the previous one
+    // must not carry over — its price would belong to a different company.
+    state.packageKey = null;
 
     renderCompanies();
     renderRecipient();
@@ -441,8 +236,8 @@
     refreshAction();
   }
 
-  // Shows the Lexware customer this company bills to, so nobody has to
-  // remember that "Ferrari" means "Scuderia Feser Graf GmbH".
+  // Shows the Lexware customer being billed, so nobody has to remember that
+  // "Ferrari" means "Scuderia Feser Graf GmbH".
   function renderRecipient() {
     var box = $('recipient');
     var company = CONFIG.companies[state.company];
@@ -465,8 +260,6 @@
       mail.textContent = company.recipient.email || 'no email on file — invoice cannot be sent';
       box.appendChild(mail);
     } else {
-      // Unresolved means the name in config doesn't match a Lexware customer.
-      // Better to say so here than to fail at the moment of invoicing.
       box.className = 'recipient bad';
       who.textContent = 'Customer not found in Lexware';
       box.appendChild(who);
@@ -478,7 +271,7 @@
     box.style.display = 'block';
   }
 
-  // ---- Packages ----------------------------------------------------------
+  // ---- Step 3: packages -------------------------------------------------
 
   function renderPackages() {
     var list = $('packageList');
@@ -494,8 +287,7 @@
     }
 
     company.packages.forEach(function (p) {
-      // Each package carries its own VAT rate from Lexware; only fall back to
-      // the global rate if the article somehow has none.
+      // Each package carries its own VAT rate from Lexware.
       var taxRate = typeof p.taxRate === 'number' ? p.taxRate : (CONFIG.taxRatePercentage || 0);
 
       var btn = document.createElement('button');
@@ -534,169 +326,29 @@
     });
   }
 
-  // ---- Action bar --------------------------------------------------------
+  // ---- Action bar -------------------------------------------------------
 
   function refreshAction() {
     var pkg = selectedPackage();
     var taxRate = pkg && typeof pkg.taxRate === 'number' ? pkg.taxRate : (CONFIG.taxRatePercentage || 0);
     $('totalVal').textContent = pkg ? money(pkg.netPrice * (1 + taxRate / 100)) : '—';
 
-    var ready = !!(state.company && state.packageKey &&
-      customerEl.value.trim() && normalizePlate(plateEl.value).length >= 2);
+    var ready = !!(state.company && state.packageKey && plateOk());
     $('submitBtn').disabled = !ready || state.busy;
-    $('submitBtn').textContent = state.busy ? 'Working…' : 'Create Invoice';
-  }
-
-  // ---- Plate lookup ------------------------------------------------------
-
-  function setHint(text, kind) {
-    var el = $('plateHint');
-    el.textContent = text;
-    el.className = 'hint' + (kind ? ' ' + kind : '');
-  }
-
-  function applyVehicle(v) {
-    state.vehicle = v;
-    // Only fill the name if the worker hasn't typed their own. Tapping from the
-    // plate field into the name field fires blur -> lookup, and the answer can
-    // land after they've started typing; without this it would erase them.
-    var untouched = !customerEl.value.trim() || customerEl.value === state.autofilledName;
-    if (v.customerName && untouched) {
-      customerEl.value = v.customerName;
-      state.autofilledName = v.customerName;
-    }
-    if (v.companyKey && CONFIG.companies[v.companyKey]) {
-      state.packageKey = v.lastPackageKey || null;
-      setCompany(v.companyKey);
-    }
-    refreshAction();
-  }
-
-  function showKnown(v) {
-    var b = $('knownBanner');
-    // Count PREVIOUS visits, not "which visit is this" — a worker reading
-    // "1st visit" on a returning car would think the lookup had failed.
-    var visits = v.visits || 0;
-    var visitText = visits === 1 ? '1 previous visit' : visits + ' previous visits';
-    var companyLabel = (CONFIG.companies[v.companyKey] || {}).label || '—';
-    b.innerHTML = '';
-
-    var line1 = document.createElement('div');
-    line1.innerHTML = '<strong>Known car</strong> — ' + visitText;
-    var line2 = document.createElement('div');
-    line2.className = 'sub';
-    line2.textContent = v.customerName + ' · ' + companyLabel;
-
-    b.appendChild(line1);
-    b.appendChild(line2);
-    b.style.display = 'block';
-  }
-
-  function clearKnown() {
-    $('knownBanner').style.display = 'none';
-    $('suggestions').innerHTML = '';
-    state.vehicle = null;
-    state.autofilledName = null;
-  }
-
-  function showSuggestions(list) {
-    var box = $('suggestions');
-    box.innerHTML = '';
-    if (!list || !list.length) return;
-
-    var note = document.createElement('p');
-    note.className = 'hint warn';
-    note.textContent = 'Similar plates already on file — tap one if it is the same car:';
-    box.appendChild(note);
-
-    list.forEach(function (s) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'suggestion';
-      var left = document.createElement('span');
-      left.className = 'plate';
-      left.textContent = s.plate;
-      var right = document.createElement('span');
-      right.className = 'who';
-      right.textContent = s.customerName || '';
-      btn.appendChild(left);
-      btn.appendChild(right);
-      btn.addEventListener('click', function () {
-        plateEl.value = s.plate;
-        state.autofilledName = null;
-        customerEl.value = '';
-        lookup(true);
-      });
-      box.appendChild(btn);
-    });
-  }
-
-  var lookupTimer = null, lookupSeq = 0;
-
-  function lookup(force) {
-    var raw = plateEl.value;
-    var key = normalizePlate(raw);
-    if (key.length < 2) {
-      state.lastLookupKey = null;
-      clearKnown();
-      setHint('Type the plate to look the car up.');
-      return;
-    }
-    // blur fires on every tap out of the field, but the plate usually hasn't
-    // changed — re-running would re-apply the saved details over live edits.
-    if (!force && key === state.lastLookupKey) return;
-    state.lastLookupKey = key;
-
-    var seq = ++lookupSeq;
-    setHint('Looking up…');
-
-    fetch('/api/vehicle?plate=' + encodeURIComponent(raw))
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        // A slower earlier request must never overwrite a newer answer.
-        if (seq !== lookupSeq) return;
-        clearKnown();
-        if (data.found && data.vehicle) {
-          setHint('Details filled in from the last visit.', 'ok');
-          showKnown(data.vehicle);
-          applyVehicle(data.vehicle);
-        } else {
-          setHint('New car — fill in the details below.', '');
-          showSuggestions(data.suggestions);
-        }
-      })
-      .catch(function () {
-        if (seq !== lookupSeq) return;
-        setHint('Lookup failed — you can still fill it in by hand.', 'warn');
-      });
+    $('submitBtn').textContent = state.busy ? 'Sending…' : 'Create & Send';
   }
 
   plateEl.addEventListener('input', function () {
     plateEl.value = plateEl.value.toUpperCase();
-    clearTimeout(lookupTimer);
-    lookupTimer = setTimeout(lookup, 450);
     refreshAction();
   });
-  plateEl.addEventListener('blur', lookup);
   plateEl.addEventListener('keydown', function (e) {
     if (e.key === 'Enter') { e.preventDefault(); plateEl.blur(); }
   });
-  customerEl.addEventListener('input', refreshAction);
 
-  // ---- Submit ------------------------------------------------------------
+  // ---- Submit -----------------------------------------------------------
 
-  function payload(confirmRename) {
-    return {
-      company: state.company,
-      customerName: customerEl.value.trim(),
-      licensePlate: plateEl.value.trim(),
-      packageKey: state.packageKey,
-      lexwareContactId: state.vehicle ? state.vehicle.lexwareContactId : null,
-      confirmRename: !!confirmRename
-    };
-  }
-
-  function submit(confirmRename) {
+  function submit() {
     if (state.busy) return;
     state.busy = true;
     refreshAction();
@@ -704,120 +356,59 @@
     fetch('/api/invoice', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload(confirmRename))
+      body: JSON.stringify({
+        company: state.company,
+        licensePlate: plateEl.value.trim(),
+        packageKey: state.packageKey
+      })
     })
       .then(function (r) { return r.json().then(function (b) { return { status: r.status, body: b }; }); })
       .then(function (res) {
         state.busy = false;
-        if (res.status === 409 && res.body.error === 'plate_conflict') { openConflict(res.body); refreshAction(); return; }
-        if (res.status >= 400) { showFailure(res.body.error || 'Something went wrong.', res.body.detail); refreshAction(); return; }
-        showSuccess(res.body);
+        if (res.status >= 400) showResult(null, res.body.error || 'Something went wrong.', res.body.detail);
+        else showResult(res.body);
         refreshAction();
       })
       .catch(function () {
         state.busy = false;
-        showFailure('No connection to the server. Check the wifi and try again.');
+        showResult(null, 'No connection to the server. Check the wifi and try again.');
         refreshAction();
       });
   }
 
-  $('submitBtn').addEventListener('click', function () { submit(false); });
+  $('submitBtn').addEventListener('click', submit);
 
-  // ---- Conflict ----------------------------------------------------------
+  // ---- Result -----------------------------------------------------------
 
-  var pendingConflict = null;
-
-  function openConflict(body) {
-    pendingConflict = body;
-    var box = $('conflictCompare');
-    box.innerHTML = '';
-
-    function row(tag, name, company) {
-      var d = document.createElement('div');
-      var t = document.createElement('div');
-      t.className = 'tag';
-      t.textContent = tag;
-      var v = document.createElement('div');
-      v.textContent = name + ' · ' + company;
-      d.appendChild(t); d.appendChild(v);
-      return d;
-    }
-
-    var onFile = body.onFile || {};
-    var sub = body.submitted || {};
-    var v = onFile.visits || 0;
-    box.appendChild(row(
-      'On file (' + v + (v === 1 ? ' visit)' : ' visits)'),
-      onFile.customerName || '—',
-      onFile.companyLabel || '—'
-    ));
-    box.appendChild(row(
-      'You typed',
-      sub.customerName || '—',
-      (CONFIG.companies[sub.companyKey] || {}).label || '—'
-    ));
-
-    $('conflictOverlay').setAttribute('data-open', 'true');
+  function showResult(body, errorMessage, detail) {
+    var ok = !!body;
+    $('resultIcon').className = 'icon' + (ok && body.emailed ? '' : ' warn');
+    $('resultIcon').textContent = ok && body.emailed ? '✓' : '!';
+    $('resultTitle').textContent = !ok ? 'Not created' : body.emailed ? 'Invoice sent' : 'Invoice created';
+    $('resultVoucher').textContent = ok ? (body.voucherNumber || '') : '';
+    $('resultPlate').textContent = ok ? (body.plate || '') : '';
+    $('resultDetail').textContent = !ok
+      ? errorMessage + (detail ? ' (' + detail + ')' : '')
+      : body.emailed
+        ? 'Emailed to ' + (body.recipientName ? body.recipientName + ' (' + body.sentTo + ')' : body.sentTo)
+        : 'Saved in Lexware, but the email did not go out. Tell the office.';
+    $('resultNext').textContent = ok ? 'Next car' : 'Back';
+    $('resultOverlay').setAttribute('data-open', 'true');
   }
 
-  function closeConflict() {
-    $('conflictOverlay').setAttribute('data-open', 'false');
-    pendingConflict = null;
-  }
-
-  $('conflictUseExisting').addEventListener('click', function () {
-    var onFile = (pendingConflict || {}).onFile || {};
-    closeConflict();
-    if (onFile.customerName) customerEl.value = onFile.customerName;
-    if (onFile.companyKey && CONFIG.companies[onFile.companyKey]) setCompany(onFile.companyKey);
-    refreshAction();
-    submit(true);
-  });
-  $('conflictOverwrite').addEventListener('click', function () { closeConflict(); submit(true); });
-  $('conflictCancel').addEventListener('click', closeConflict);
-
-  // ---- Result ------------------------------------------------------------
-
-  function showSuccess(body) {
-    $('successIcon').className = 'success-icon' + (body.emailed ? '' : ' warn');
-    $('successIcon').textContent = body.emailed ? '✓' : '!';
-    $('successTitle').textContent = body.emailed ? 'Invoice sent' : 'Invoice created';
-    $('successVoucher').textContent = body.voucherNumber || '';
-    $('successDetail').textContent = body.emailed
-      ? 'Emailed to ' + (body.recipientName ? body.recipientName + ' (' + body.sentTo + ')' : body.sentTo)
-      : 'Saved in Lexware, but the email did not go out. Tell the office.';
-    $('successNext').textContent = 'Next car';
-    $('successOverlay').setAttribute('data-open', 'true');
-  }
-
-  function showFailure(message, detail) {
-    $('successIcon').className = 'success-icon warn';
-    $('successIcon').textContent = '!';
-    $('successTitle').textContent = 'Not created';
-    $('successVoucher').textContent = '';
-    $('successDetail').textContent = message + (detail ? ' (' + detail + ')' : '');
-    $('successNext').textContent = 'Back';
-    $('successOverlay').setAttribute('data-open', 'true');
-  }
-
-  $('successNext').addEventListener('click', function () {
-    $('successOverlay').setAttribute('data-open', 'false');
-    // Only reset for a genuinely new car if the last one actually went through.
-    if ($('successTitle').textContent !== 'Not created') {
+  $('resultNext').addEventListener('click', function () {
+    $('resultOverlay').setAttribute('data-open', 'false');
+    // Only clear for a new car if the last one actually went through.
+    if ($('resultTitle').textContent !== 'Not created') {
       plateEl.value = '';
-      customerEl.value = '';
       state.packageKey = null;
-      state.lastLookupKey = null;
-      state.autofilledName = null;
-      clearKnown();
-      setHint('Type the plate to look the car up.');
       renderPackages();
       refreshAction();
       plateEl.focus();
     }
   });
 
-  // ---- Boot --------------------------------------------------------------
+  // ---- Boot -------------------------------------------------------------
 
   fetch('/api/config')
     .then(function (r) { return r.json(); })
@@ -825,8 +416,7 @@
       CONFIG = cfg;
       // Staff need to know when they're looking at stand-in prices, because an
       // invoice sent at a stale price is a real problem to unwind.
-      var src = cfg.priceSource || {};
-      if (src.usedFallback) {
+      if ((cfg.priceSource || {}).usedFallback) {
         var w = $('priceWarn');
         w.textContent = 'Prices could not be loaded from Lexware — showing the built-in list. Check with the office before invoicing.';
         w.style.display = 'block';
@@ -834,12 +424,12 @@
       renderCompanies();
       renderPackages();
       refreshAction();
-      // A single company means there is nothing to choose — preselect it.
       var keys = Object.keys(CONFIG.companies);
       if (keys.length === 1) setCompany(keys[0]);
+      plateEl.focus();
     })
     .catch(function () {
-      setHint('Could not load the app config. Reload the page.', 'err');
+      $('packageList').innerHTML = '<p class="package-empty">Could not load the app. Reload the page.</p>';
     });
 })();
 </script>

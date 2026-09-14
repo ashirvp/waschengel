@@ -7,8 +7,6 @@
 // would produce an invoice with no address and a duplicate in your books,
 // which is far worse than a clear error on screen.
 
-const fs = require('fs');
-const path = require('path');
 const config = require('./config');
 const lexware = require('./lexware');
 
@@ -24,41 +22,12 @@ function extractEmail(contact) {
 }
 
 // --- cache -----------------------------------------------------------------
-// Purely a shortcut. Everything in it can be rebuilt from Lexware, so a lost
-// cache file costs one extra API call, never a duplicate contact.
+// In memory for the life of the process, and nowhere else. Rebuilt from Lexware
+// whenever it's empty, which costs one lookup per company per cold start. That
+// keeps the app completely stateless: no disk, no database, nothing to back up
+// and nothing to lose on a redeploy.
 
-let memo = null;
-
-function readCache() {
-  if (memo) return memo;
-  try {
-    const raw = JSON.parse(fs.readFileSync(config.contactCacheFile, 'utf8'));
-    // Older versions stored a bare id string per company; upgrade in place.
-    memo = {};
-    Object.entries(raw).forEach(([k, v]) => {
-      memo[k] = typeof v === 'string' ? { id: v, name: null, email: null } : v;
-    });
-  } catch {
-    memo = {};
-  }
-  return memo;
-}
-
-let cacheWriteWarned = false;
-
-function writeCache() {
-  try {
-    fs.mkdirSync(path.dirname(config.contactCacheFile), { recursive: true });
-    fs.writeFileSync(config.contactCacheFile, JSON.stringify(readCache(), null, 2));
-  } catch (e) {
-    // Read-only filesystems (Vercel, Lambda) can't keep this. It's only a
-    // cache, so carry on — but say so once rather than on every resolve.
-    if (!cacheWriteWarned) {
-      cacheWriteWarned = true;
-      console.warn(`Contact cache is not writable (${e.message}). Continuing without it.`);
-    }
-  }
-}
+let memo = {};
 
 class ContactError extends Error {
   constructor(message, { companyKey, wantedName, candidates = [] } = {}) {
@@ -83,8 +52,7 @@ async function resolveCompanyContact(companyKey, { force = false } = {}) {
     );
   }
 
-  const cache = readCache();
-  const hit = cache[companyKey];
+  const hit = memo[companyKey];
   // Only trust the cache if it was stored for the name we currently want —
   // otherwise renaming a company in config.js would keep billing the old one.
   if (!force && hit && hit.id && normalizeName(hit.name) === normalizeName(wanted)) {
@@ -108,8 +76,7 @@ async function resolveCompanyContact(companyKey, { force = false } = {}) {
   if (exact.length === 1) {
     const c = exact[0];
     const entry = { id: c.id, name: lexware.contactDisplayName(c), email: extractEmail(c) };
-    cache[companyKey] = entry;
-    writeCache();
+    memo[companyKey] = entry;
     return entry;
   }
 
@@ -134,8 +101,7 @@ async function resolveCompanyContact(companyKey, { force = false } = {}) {
     countryCode: (company.address && company.address.countryCode) || 'DE',
   });
   const entry = { id: res.id, name: wanted, email: company.billingEmailOverride || null };
-  cache[companyKey] = entry;
-  writeCache();
+  memo[companyKey] = entry;
   return entry;
 }
 
@@ -187,5 +153,5 @@ module.exports = {
   recipients,
   extractEmail,
   ContactError,
-  _reset: () => { memo = null; },
+  _reset: () => { memo = {}; },
 };

@@ -1,18 +1,7 @@
-// License plates are typed by hand on a phone, in a hurry, by different people.
-// "M-AB 1234", "m ab1234" and "MAB-1234" are the same car, so every lookup and
-// every duplicate check goes through normalizePlate() — the normalized form is
-// the only thing we ever use as a key.
+// The vehicle number is the only per-job detail, and it goes onto the invoice
+// as text. Nothing is stored, so this is just tidy-up and a sanity check.
 
-// Keep German umlauts: some plates legitimately contain Ä/Ö/Ü.
-function normalizePlate(raw) {
-  return String(raw == null ? '' : raw)
-    .toUpperCase()
-    .replace(/[^A-Z0-9ÄÖÜ]/g, '');
-}
-
-// What we show back to the worker: their own spacing, just tidied and upper-cased.
-// We deliberately don't reformat into a canonical "M-AB 1234" shape, because
-// foreign plates don't follow the German pattern and guessing looks broken.
+// Workers type in a hurry on a phone; show the plate back in a clean form.
 function displayPlate(raw) {
   return String(raw == null ? '' : raw)
     .toUpperCase()
@@ -23,8 +12,8 @@ function displayPlate(raw) {
 // Loose on purpose. A garage sees Swiss, Austrian and dealer plates too, so we
 // only reject input that can't be a plate at all rather than enforcing a format.
 function isPlausiblePlate(raw) {
-  const key = normalizePlate(raw);
-  return key.length >= 2 && key.length <= 15;
+  const bare = String(raw == null ? '' : raw).replace(/[^A-Za-z0-9ÄÖÜäöü]/g, '');
+  return bare.length >= 2 && bare.length <= 15;
 }
 
-module.exports = { normalizePlate, displayPlate, isPlausiblePlate };
+module.exports = { displayPlate, isPlausiblePlate };

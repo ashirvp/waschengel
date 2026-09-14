@@ -5,21 +5,14 @@ require('dotenv').config();
 const app = require('./src/app');
 const config = require('./src/config');
 const contacts = require('./src/contacts');
-const store = require('./src/store');
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, async () => {
   console.log(`Garage invoice app running on http://localhost:${PORT}`);
 
-  const where = store.describe();
-  console.log(`Vehicle registry: ${where.detail}`);
-  if (!where.persistent) {
-    console.log('  ^ this will NOT survive a restart on this host.');
-  }
-
   // Resolve the Lexware customers now, so a misspelled name shows up in the
-  // startup log rather than on the first invoice of the day.
+  // startup log rather than on the first job of the day.
   if (config.lexware.apiKey) {
     const resolved = await contacts.warmAll();
     Object.entries(resolved).forEach(([key, r]) => {

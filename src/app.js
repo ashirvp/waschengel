@@ -7,8 +7,7 @@ const lexware = require('./lexware');
 const articles = require('./articles');
 const contacts = require('./contacts');
 const checks = require('./checks');
-const store = require('./store');
-const { normalizePlate, displayPlate, isPlausiblePlate } = require('./plates');
+const { displayPlate, isPlausiblePlate } = require('./plates');
 const { sendInvoiceEmail } = require('./mailer');
 
 const app = express();
@@ -26,9 +25,9 @@ app.get('/api/config', async (req, res) => {
   const recipients = await contacts.recipients();
   const byKey = new Map(all.map((p) => [p.key, p]));
 
+  // Each company shows only its own packages, in the order listed in config.
   function packagesFor(company) {
-    if (!Array.isArray(company.packages) || !company.packages.length) return all;
-    return company.packages.map((t) => byKey.get(articles.slug(t))).filter(Boolean);
+    return (company.packages || []).map((t) => byKey.get(articles.slug(t))).filter(Boolean);
   }
 
   res.json({
@@ -55,50 +54,6 @@ app.get('/api/config', async (req, res) => {
     // Lets the UI warn staff when prices are the built-in fallback rather than
     // the live ones from Lexware.
     priceSource: articles.status(),
-  });
-});
-
-// Plate lookup. This is the first thing the app does when a worker types a
-// plate: if we've seen the car before we can fill in the rest of the form.
-app.get('/api/vehicle', async (req, res) => {
-  const plate = req.query.plate;
-  if (!isPlausiblePlate(plate)) {
-    return res.json({ found: false, plate: displayPlate(plate), suggestions: [] });
-  }
-
-  const vehicle = await store.findByPlate(plate);
-  if (vehicle) {
-    // Guard against a company that was renamed or removed in config.js since
-    // this car's last visit — better to ask again than to preselect a dead key.
-    const known = Boolean(config.companies[vehicle.companyKey]);
-    return res.json({
-      found: true,
-      vehicle: { ...vehicle, companyKey: known ? vehicle.companyKey : null },
-      suggestions: [],
-    });
-  }
-
-  // No exact match: offer near matches so a mistyped plate doesn't silently
-  // become a second record for a car we already know.
-  res.json({
-    found: false,
-    plate: displayPlate(plate),
-    suggestions: (await store.searchVehicles(plate)).map((v) => ({
-      plate: v.plate,
-      customerName: v.customerName,
-      companyKey: v.companyKey,
-    })),
-  });
-});
-
-app.get('/api/vehicles/recent', async (req, res) => {
-  res.json({
-    vehicles: (await store.recentVehicles()).map((v) => ({
-      plate: v.plate,
-      customerName: v.customerName,
-      companyKey: v.companyKey,
-    })),
-    stats: await store.stats(),
   });
 });
 
@@ -257,64 +212,27 @@ function renderAdmin(report) {
 }
 
 app.post('/api/invoice', async (req, res) => {
-  const {
-    company,
-    customerName,
-    licensePlate,
-    packageKey,
-    email,
-    lexwareContactId,
-    confirmRename,
-  } = req.body || {};
+  const { company, licensePlate, packageKey, email } = req.body || {};
 
   if (!company || !config.companies[company]) {
     return res.status(400).json({ error: 'Please choose a valid company.' });
   }
-  if (!customerName || !customerName.trim()) {
-    return res.status(400).json({ error: 'Please enter the customer name.' });
-  }
   if (!isPlausiblePlate(licensePlate)) {
-    return res.status(400).json({ error: 'Please enter the license plate.' });
+    return res.status(400).json({ error: 'Please enter the vehicle number.' });
   }
+
   const pkg = await articles.findPackage(packageKey);
   if (!pkg) {
     return res.status(400).json({ error: 'Please choose a valid service package.' });
   }
-  // A company with its own menu must not be billed for something off it.
-  const menu = config.companies[company].packages;
-  if (Array.isArray(menu) && menu.length && !menu.some((t) => articles.slug(t) === pkg.key)) {
+  // Each company has its own menu; it must not be billed for something off it.
+  const menu = config.companies[company].packages || [];
+  if (!menu.some((t) => articles.slug(t) === pkg.key)) {
     return res.status(400).json({ error: 'That package is not available for this company.' });
   }
 
-  const cleanName = customerName.trim();
-  const plateKey = normalizePlate(licensePlate);
-  const known = await store.findByPlate(licensePlate);
-
-  // This plate is already on file under a different name. That is either a typo
-  // or a genuine change of owner, and only the worker can tell which — so stop
-  // and ask rather than quietly overwriting the record or creating a twin.
-  if (known && !confirmRename) {
-    const nameChanged = known.customerName.trim().toLowerCase() !== cleanName.toLowerCase();
-    const companyChanged = known.companyKey && known.companyKey !== company;
-    if (nameChanged || companyChanged) {
-      return res.status(409).json({
-        error: 'plate_conflict',
-        message: 'This plate is already on file with different details.',
-        onFile: {
-          plate: known.plate,
-          customerName: known.customerName,
-          companyKey: known.companyKey,
-          companyLabel: config.companies[known.companyKey]
-            ? config.companies[known.companyKey].label
-            : known.companyKey,
-          visits: known.visits,
-        },
-        submitted: { customerName: cleanName, companyKey: company },
-      });
-    }
-  }
-
   const companyConfig = config.companies[company];
+  const plate = displayPlate(licensePlate);
 
   let contact;
   try {
@@ -339,12 +257,12 @@ app.post('/api/invoice', async (req, res) => {
   }
 
   try {
-    const contactId = contact.id;
-
-    const introduction = `${pkg.title} — ${cleanName} — Plate: ${displayPlate(licensePlate)}`;
+    // The vehicle number is the only per-job detail, and this is the only place
+    // it lives: on the invoice itself. Nothing is stored anywhere.
+    const introduction = `${pkg.title} — Vehicle: ${plate}`;
 
     const created = await lexware.createInvoice({
-      contactId,
+      contactId: contact.id,
       introduction,
       lineItem: {
         name: pkg.title,
@@ -360,23 +278,6 @@ app.post('/api/invoice', async (req, res) => {
     const invoice = await lexware.getInvoice(created.id);
     const voucherNumber = invoice.voucherNumber || created.id;
 
-    // Record the visit before emailing: the invoice already exists in Lexware
-    // at this point, so the registry must reflect that even if the mail fails.
-    let vehicle = null;
-    try {
-      vehicle = await store.recordVisit({
-        plate: licensePlate,
-        customerName: cleanName,
-        companyKey: company,
-        packageKey,
-        voucherNumber,
-        invoiceId: created.id,
-        lexwareContactId: lexwareContactId || null,
-      });
-    } catch (e) {
-      console.error('Could not record the vehicle visit:', e.message);
-    }
-
     let emailed = false;
     let emailError = null;
     try {
@@ -385,12 +286,13 @@ app.post('/api/invoice', async (req, res) => {
         to: recipientEmail,
         companyLabel: contact.name || companyConfig.label,
         voucherNumber,
+        plate,
         pdfBuffer,
       });
       emailed = true;
     } catch (e) {
-      // Invoice was created successfully in Lexware even if the email fails —
-      // surface that clearly instead of pretending the whole thing failed.
+      // The invoice exists in Lexware even if the email fails — surface that
+      // clearly instead of pretending the whole thing failed.
       emailError = e.message;
       console.error('Email sending failed:', e);
     }
@@ -403,9 +305,7 @@ app.post('/api/invoice', async (req, res) => {
       emailError,
       sentTo: recipientEmail,
       recipientName: contact.name,
-      plate: displayPlate(licensePlate),
-      plateKey,
-      visits: vehicle ? vehicle.visits : null,
+      plate,
     });
   } catch (err) {
     console.error('Invoice creation failed:', err.detail || err.message);

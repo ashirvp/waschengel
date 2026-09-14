@@ -7,10 +7,6 @@
 // The app adjusts automatically.
 // ---------------------------------------------------------------------------
 
-const path = require('path');
-
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
-
 module.exports = {
   // Lexware (formerly lexoffice) API
   lexware: {
@@ -18,39 +14,20 @@ module.exports = {
     apiKey: process.env.LEXWARE_API_KEY,
   },
 
-  // Everything the app needs to keep between restarts lives under DATA_DIR.
-  // On a host with an ephemeral filesystem, point DATA_DIR at a mounted volume
-  // or the vehicle registry is lost on every deploy (see the README).
-  dataDir: DATA_DIR,
-
-  // Where we remember the Lexware contactId created for each company. This is
-  // only a cache now: if it's missing, we look the contact up in Lexware by
-  // name instead of blindly creating a second one.
-  contactCacheFile: path.join(DATA_DIR, 'contacts.json'),
-
-  // Plate -> customer/company/history. Lexware has no vehicle entity, so this
-  // is the one piece of data the app owns itself.
-  vehicleFile: path.join(DATA_DIR, 'vehicles.json'),
-
   // --- SERVICE PACKAGES -----------------------------------------------------
   //
   // The packages staff can pick are your PRODUCTS IN LEXWARE (Artikel). Prices
   // and descriptions are fetched from there, so changing a price in Lexware is
   // enough — no edit here, no redeploy.
   //
-  // This list says WHICH of your Lexware products staff may pick, and in what
-  // order. Titles are matched loosely (case, spaces and punctuation are
-  // ignored), but the wording must otherwise match the article in Lexware.
-  // Run `npm run articles` to print exactly what your account has.
+  // EACH COMPANY HAS ITS OWN LIST, below in `companies`. A product with its own
+  // price per company is simply its own product in Lexware (which is why
+  // "Complete Ferrari NW" is separate from "Complete NW"); list it under the
+  // company it belongs to.
   //
-  // Empty list = show every article in your Lexware account.
-  packageAllowlist: [
-    'Complete Ferrari NW',
-    'Complete GW',
-    'Complete NW',
-    'Servicewäsche Basic',
-    'Servicewäsche Plus',
-  ],
+  // Titles are matched loosely (case, spaces and punctuation are ignored), but
+  // the wording must otherwise match the article in Lexware. Run
+  // `npm run articles` to print exactly what your account has.
 
   // How long a fetched price list is reused before checking Lexware again.
   articleCacheMs: Number(process.env.ARTICLE_CACHE_MS || 10 * 60 * 1000),
@@ -87,6 +64,12 @@ module.exports = {
       contactName: 'Feser Sportwagen GmbH',
       billingEmailOverride: process.env.LAMBO_MCLAREN_BILLING_EMAIL || null,
       address: { countryCode: 'DE' },
+      packages: [
+        'Complete GW',
+        'Complete NW',
+        'Servicewäsche Basic',
+        'Servicewäsche Plus',
+      ],
     },
 
     ferrari: {
@@ -94,6 +77,13 @@ module.exports = {
       contactName: 'Scuderia Feser Graf GmbH',
       billingEmailOverride: process.env.FERRARI_BILLING_EMAIL || null,
       address: { countryCode: 'DE' },
+      packages: [
+        'Complete Ferrari NW',
+        'Complete GW',
+        'Complete NW',
+        'Servicewäsche Basic',
+        'Servicewäsche Plus',
+      ],
     },
 
     bentley: {
@@ -101,6 +91,12 @@ module.exports = {
       contactName: 'Feser Graf Exclusive Cars GmbH',
       billingEmailOverride: process.env.BENTLEY_BILLING_EMAIL || null,
       address: { countryCode: 'DE' },
+      packages: [
+        'Complete GW',
+        'Complete NW',
+        'Servicewäsche Basic',
+        'Servicewäsche Plus',
+      ],
     },
   },
 
@@ -122,3 +118,12 @@ module.exports = {
     from: process.env.SMTP_FROM || process.env.SMTP_USER,
   },
 };
+
+// The set of Lexware products the app cares about: every title mentioned by any
+// company. Derived rather than typed, so a product added to a company's list
+// can't be forgotten here.
+module.exports.packageAllowlist = [
+  ...new Set(
+    Object.values(module.exports.companies).flatMap((c) => c.packages || [])
+  ),
+];

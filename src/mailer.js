@@ -20,12 +20,14 @@ function getTransporter() {
   return transporter;
 }
 
-async function sendInvoiceEmail({ to, companyLabel, voucherNumber, pdfBuffer }) {
+async function sendInvoiceEmail({ to, companyLabel, voucherNumber, plate, pdfBuffer }) {
   await getTransporter().sendMail({
     from: config.smtp.from,
     to,
-    subject: `Invoice ${voucherNumber} — ${companyLabel}`,
-    text: `Please find attached invoice ${voucherNumber}.`,
+    subject: `Invoice ${voucherNumber} — ${companyLabel}${plate ? ' — ' + plate : ''}`,
+    text:
+      `Please find attached invoice ${voucherNumber}.` +
+      (plate ? `\n\nVehicle: ${plate}` : ''),
     attachments: [
       {
         filename: `${voucherNumber}.pdf`,
