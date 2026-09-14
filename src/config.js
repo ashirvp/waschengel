@@ -22,7 +22,7 @@ module.exports = {
   //
   // EACH COMPANY HAS ITS OWN LIST, below in `companies`. A product with its own
   // price per company is simply its own product in Lexware (which is why
-  // "Complete Ferrari NW" is separate from "Complete NW"); list it under the
+  // "Komplett Ferrari NW" is separate from "Komplett NW"); list it under the
   // company it belongs to.
   //
   // Titles are matched loosely (case, spaces and punctuation are ignored), but

@@ -19,9 +19,9 @@ billed, and the app uses that customer's own address, payment terms and email:
 
 | Staff tap | Invoice is addressed to |
 | --- | --- |
-| Ferrari | Scuderia Feser Graf GmbH |
+| Ferrari | Scuderia Feser-Graf GmbH |
 | Lamborghini / McLaren | Feser Sportwagen GmbH |
-| Bentley | Feser Graf Exclusive Cars GmbH |
+| Bentley | Feser- Graf Exclusive Cars GmbH |
 
 **Each company has its own service packages**, listed in `src/config.js`.
 Prices come from your Lexware products, so changing a price in Lexware is
@@ -61,18 +61,18 @@ order on screen:
 ```js
 ferrari: {
   label: 'Ferrari',
-  contactName: 'Scuderia Feser Graf GmbH',
+  contactName: 'Scuderia Feser-Graf GmbH',
   packages: [
-    'Complete Ferrari NW',
-    'Complete GW',
+    'Komplett Ferrari NW',
+    'Komplett GW',
     ...
   ],
 },
 ```
 
 A service that costs a different amount for a different company is simply its
-own product in Lexware (which is why `Complete Ferrari NW` is separate from
-`Complete NW`) — list it under the company it belongs to. Run
+own product in Lexware (which is why `Komplett Ferrari NW` is separate from
+`Komplett NW`) — list it under the company it belongs to. Run
 `npm run articles` to see exactly what your account has.
 
 **Never commit `.env`.** It is in `.gitignore`; keep it there, and put the real
@@ -173,9 +173,13 @@ Honestly: **almost nothing.** That's the point of this setup.
 2. **Make sure the three dealer customers exist and are complete.** These are
    the real customers the invoices are addressed to:
 
-   - Scuderia Feser Graf GmbH
+   - Scuderia Feser-Graf GmbH
    - Feser Sportwagen GmbH
-   - Feser Graf Exclusive Cars GmbH
+   - Feser- Graf Exclusive Cars GmbH
+
+   The spelling must match the customer record exactly — punctuation included.
+   Two of these carry hyphens that are easy to miss, and one has a space after
+   the hyphen. `npm run contacts` is the check.
 
    Each needs its address, VAT id, payment terms and a **business email
    address** filled in, because the app takes all of that from Lexware. The app
@@ -227,7 +231,7 @@ The app refuses rather than guessing, and says why on screen:
 - **A company's customer isn't found in Lexware** (or two customers share the
   name) — invoicing that company is blocked, and the company panel turns red
   before anyone taps anything. `contactName` in `src/config.js` must match the
-  customer in Lexware exactly. The app never creates a customer: a bare
+  customer in Lexware exactly, punctuation included. The app never creates a customer: a bare
   stand-in with no address on a real invoice is worse than an error.
 - **A customer has no email on file** — blocked with that specific reason,
   rather than creating an invoice nobody receives.

@@ -8,11 +8,14 @@ const config = require('./config');
 const lexware = require('./lexware');
 
 // Used only when Lexware can't be reached (no key yet, API down, no network).
+// THE TITLES MUST MATCH THE REAL ARTICLES IN LEXWARE. They are looked up by the
+// same allowlist as the live ones, so a title that drifts here means staff see
+// an empty package list exactly when Lexware is already down.
 // Staff can still invoice; the prices are the ones agreed at the time of
 // writing and are replaced by the live ones as soon as a fetch succeeds.
 const FALLBACK = [
   {
-    title: 'Complete Ferrari NW',
+    title: 'Komplett Ferrari NW',
     netPrice: 530,
     taxRate: 19,
     unitName: 'Stück',
@@ -20,7 +23,7 @@ const FALLBACK = [
       'Vacuuming of the interior and trunk, interior and exterior window cleaning, hand wash of the exterior, paint cleaning, wheel cleaning, vehicle sealing, vehicle polishing, hologram removal including fine sanding and polishing, cleaning of door sills and edges, intensive cleaning and care of the cockpit/plastics throughout the interior, headliner cleaning, carpet and floor mat cleaning, leather seat and upholstery cleaning (shampooing), refreshing of exterior plastic parts and tires',
   },
   {
-    title: 'Complete GW',
+    title: 'Komplett GW',
     netPrice: 435,
     taxRate: 19,
     unitName: 'Stück',
@@ -28,7 +31,7 @@ const FALLBACK = [
       'Vacuuming of the interior and trunk, interior and exterior window cleaning, hand washing of the exterior, paint cleaning, wheel cleaning, vehicle sealing, vehicle polishing, vehicle waxing, cleaning of door sills and edges, intensive cleaning and care of the cockpit/plastic surfaces throughout the interior, headliner cleaning, carpet and floor mat cleaning, leather seat and upholstery care (shampooing), refreshing of exterior plastic parts and tires',
   },
   {
-    title: 'Complete NW',
+    title: 'Komplett NW',
     netPrice: 330,
     taxRate: 19,
     unitName: 'Stück',
