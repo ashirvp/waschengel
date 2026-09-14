@@ -359,6 +359,11 @@ already has it.
 - **Amber "prices could not be loaded from Lexware"** — the app is showing its
   built-in fallback prices. Check `LEXWARE_API_KEY` and that the account's plan
   includes API access.
+- **A fix doesn't seem to have taken effect** — check which build is live
+  before anything else. The version is printed at the bottom of the app screen
+  and served by `/api/version`; compare it with the latest commit. Vercel only
+  deploys the branch set as **Production Branch** in the project settings, so a
+  push to a different branch changes nothing in production.
 - **"Could not create the invoice in Lexware"** — the message after the dash is
   Lexware's own, naming the field it rejected (e.g.
   `shippingConditions → not_empty`). The full response body is in the server

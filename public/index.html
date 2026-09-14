@@ -113,6 +113,8 @@
   .icon.warn { background:rgba(224,160,44,.14); border-color:var(--warn); color:var(--warn); }
   .voucher { font-size:26px; font-weight:700; letter-spacing:.04em; margin:6px 0 2px; }
   .plate-out { font-size:14px; color:var(--muted); margin-bottom:10px; letter-spacing:.06em; }
+  .build { text-align:center; color:var(--muted-2); font-size:11px; padding:4px 0 0; letter-spacing:.04em; }
+
   .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
     clip:rect(0,0,0,0); white-space:nowrap; border:0; }
   @media (min-width:700px) { main { padding:24px 16px; } }
@@ -150,6 +152,7 @@
       <p class="package-empty">Pick a company first.</p>
     </div>
   </section>
+  <p class="build" id="build"></p>
 </main>
 
 <div class="actionbar">
@@ -420,6 +423,13 @@
   });
 
   // ---- Boot -------------------------------------------------------------
+
+  // Show which build is live, so a stale deployment is visible at a glance
+  // rather than looking like a bug that was already fixed.
+  fetch('/api/version')
+    .then(function (r) { return r.json(); })
+    .then(function (v) { $('build').textContent = 'build ' + (v.commit || '?'); })
+    .catch(function () { /* not important enough to surface */ });
 
   fetch('/api/config')
     .then(function (r) { return r.json(); })

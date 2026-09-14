@@ -10,6 +10,9 @@ const checks = require('./checks');
 const { displayPlate, isPlausiblePlate } = require('./plates');
 
 const app = express();
+
+// When this process booted — on serverless this is the cold start.
+const STARTED_AT = new Date().toISOString();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -76,6 +79,19 @@ app.get('/api/contacts', async (req, res) => {
     console.error('Contact lookup failed:', err.detail || err.message);
     res.json({ contacts: [], error: 'Lexware lookup unavailable' });
   }
+});
+
+// Which build is actually running. Without this it is guesswork whether a fix
+// has reached production: the app looks identical, and a stale deployment
+// silently reproduces bugs that are already fixed in the repo.
+app.get('/api/version', (req, res) => {
+  const sha = process.env.VERCEL_GIT_COMMIT_SHA || process.env.GIT_COMMIT_SHA || null;
+  res.json({
+    commit: sha ? sha.slice(0, 7) : 'unknown',
+    branch: process.env.VERCEL_GIT_COMMIT_REF || null,
+    deployedAt: process.env.VERCEL_DEPLOYMENT_ID ? null : 'local',
+    startedAt: STARTED_AT,
+  });
 });
 
 // Setup report in a browser, so checking the configuration doesn't need a
