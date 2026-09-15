@@ -165,7 +165,7 @@ function renderAdmin(report) {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Setup check</title>
+<title>WaschEngel Invoice — Setup check</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -193,11 +193,11 @@ function renderAdmin(report) {
      every row into two broken lines. Let it scroll sideways instead. */
   pre.notes { margin:0 0 10px; white-space:pre; overflow-x:auto; }
   button { width:100%; min-height:52px; margin-bottom:18px; border:none; border-radius:12px;
-           background:#eef0f3; color:#121316; font-family:inherit; font-size:16px; font-weight:700; cursor:pointer; }
+           background:#ffd100; color:#14151a; font-family:inherit; font-size:16px; font-weight:700; cursor:pointer; }
   .foot { color:#6b7180; font-size:12px; margin-top:18px; }
 </style></head>
 <body><div class="wrap">
-  <h1>Setup check</h1>
+  <h1>WaschEngel Invoice — setup check</h1>
   <div class="sub">${escapeHtml(report.generatedAt)}</div>
   <div class="banner ${allGood ? 'good' : 'bad'}">
     ${summary.passed} of ${summary.total} checks passed.${allGood ? ' Everything is ready — send one test invoice to confirm.' : ''}

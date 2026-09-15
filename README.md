@@ -1,4 +1,4 @@
-# Garage Invoice App
+# WaschEngel Invoice
 
 One screen, three taps. A worker types the vehicle number, taps the company,
 taps the service package — the app creates the finalised invoice in Lexware
@@ -302,6 +302,7 @@ is.
 | `src/plates.js` | tidying the vehicle number for the invoice |
 | `src/checks.js` | the setup checks, shared by `npm run doctor` and `/admin` |
 | `public/index.html` | the whole mobile UI, no build step |
+| `public/logo.svg` | the logo in the header — replace this one file to change it |
 
 ## Sending the invoice
 
@@ -321,6 +322,21 @@ address on file**, so the office can send in one click. `npm run doctor` and
 The confirmation screen tells the worker exactly this — "Saved in Lexware for
 <customer>. The office sends it from Lexware." — so nobody assumes the dealer
 already has it.
+
+## Branding
+
+The header shows `public/logo.svg` and the app is themed in WaschEngel yellow
+(`--accent` in `public/index.html`).
+
+`public/logo.svg` is a plain typographic wordmark. **To use the real winged
+logo, overwrite that one file** with your artwork — SVG keeps it crisp, but a
+PNG works too if you point the `<img src>` in `public/index.html` at it. Nothing
+else needs changing; it renders at the same size either way.
+
+Each company still has its own colour (`[data-brand="…"]` blocks), but it now
+only tints that company's dot and its selected border. The app itself stays
+WaschEngel yellow, and the "Invoice goes to" panel names the actual customer —
+a clearer check than a colour.
 
 ## Security
 

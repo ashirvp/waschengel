@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>Garage Invoice</title>
+<title>WaschEngel Invoice</title>
 <style>
   /* Three taps and a plate, one thumb, gloves on. Everything tappable is at
      least 56px and every input is >=16px so iOS doesn't zoom on focus.
@@ -16,15 +16,20 @@
     --bg:#121316; --card:#1b1d22; --card-2:#202329; --line:#2c2f36;
     --text:#eef0f3; --muted:#9198a3; --muted-2:#6b7180;
     --ok:#35c46a; --warn:#e0a02c; --err:#ef4b52;
-    --accent:#8b90a0; --accent-contrast:#ffffff;
+    /* WaschEngel yellow. The app's colour never changes — the company you pick
+       is identified by name and by its own dot, not by recolouring everything,
+       so the screen always looks like WaschEngel. */
+    --accent:#ffd100; --accent-contrast:#14151a;
+    --brand:#6b7180;
   }
-  /* Brand identity — the company you pick recolors the console. Not decoration:
-     a wrong brand color is a visible flag that you're about to invoice the
-     wrong company. To add a company, add a [data-brand="yourkey"] block using
-     the same key as in src/config.js. */
-  [data-brand="lambo_mclaren"] { --accent:#e8d200; --accent-contrast:#14151a; }
-  [data-brand="ferrari"]       { --accent:#d2001c; --accent-contrast:#ffffff; }
-  [data-brand="bentley"]       { --accent:#1f7a4d; --accent-contrast:#ffffff; }
+  /* Each company's own colour, used for its dot and its selected border. It no
+     longer repaints the whole app: the "Invoice goes to" panel names the real
+     customer, which is a clearer safety check than a colour ever was.
+     To add a company, add a [data-brand="yourkey"] block using the same key as
+     in src/config.js. */
+  [data-brand="lambo_mclaren"] { --brand:#e8d200; }
+  [data-brand="ferrari"]       { --brand:#d2001c; }
+  [data-brand="bentley"]       { --brand:#1f7a4d; }
 
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body { margin:0; background:var(--bg); color:var(--text); font-size:16px; line-height:1.4;
@@ -35,9 +40,16 @@
   header { position:sticky; top:0; z-index:5; display:flex; align-items:center; justify-content:space-between;
     gap:12px; padding:calc(12px + env(safe-area-inset-top)) 16px 12px;
     background:rgba(18,19,22,.92); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); }
-  header h1 { margin:0; font-size:17px; font-weight:700; letter-spacing:.3px; }
-  .brand-dot { width:12px; height:12px; border-radius:50%; background:var(--accent); flex:none; transition:background .2s; }
+  .brandmark { display:flex; align-items:center; gap:9px; min-width:0; }
+  /* Swap public/logo.svg for the real artwork and it appears here at this size. */
+  .logo { height:34px; width:auto; max-width:190px; display:block; }
+  .apptag {
+    flex:none; font-size:11px; font-weight:700; letter-spacing:.10em; text-transform:uppercase;
+    color:var(--accent-contrast); background:var(--accent); border-radius:5px; padding:3px 7px;
+  }
+  .brand-dot { width:12px; height:12px; border-radius:50%; background:var(--brand); flex:none; transition:background .2s; }
   .brand-name { font-size:13px; color:var(--muted); }
+  @media (max-width:380px) { .logo { height:28px; } .brand-name { display:none; } }
 
   main { flex:1; padding:16px; display:grid; gap:14px; max-width:640px; width:100%; margin:0 auto; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; }
@@ -123,8 +135,11 @@
 <body>
 
 <header>
-  <h1>Garage Invoice</h1>
-  <div style="display:flex;align-items:center;gap:8px">
+  <div class="brandmark">
+    <img class="logo" src="logo.svg" alt="WaschEngel" />
+    <span class="apptag">Invoice</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;min-width:0">
     <span class="brand-name" id="brandName">No company</span>
     <span class="brand-dot" id="brandDot"></span>
   </div>
@@ -211,13 +226,13 @@
       btn.className = 'company-btn';
       btn.setAttribute('aria-pressed', String(state.company === key));
       btn.textContent = CONFIG.companies[key].label;
-      // Read each brand's colour from its own CSS block, so the swatch here and
-      // the accent everywhere else can never drift apart.
+      // Read each company's colour from its own CSS block, so the swatch here
+      // and the selected border can never drift apart.
       var probe = document.createElement('div');
       probe.setAttribute('data-brand', key);
       probe.style.display = 'none';
       document.body.appendChild(probe);
-      btn.style.setProperty('--dot', getComputedStyle(probe).getPropertyValue('--accent').trim());
+      btn.style.setProperty('--dot', getComputedStyle(probe).getPropertyValue('--brand').trim());
       document.body.removeChild(probe);
       btn.addEventListener('click', function () { setCompany(key); });
       grid.appendChild(btn);
